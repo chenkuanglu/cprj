@@ -39,7 +39,7 @@ double monotime(void)
     if (clock_gettime(CLOCK_MONOTONIC, &tms) != 0) {
         return -1;
     }
-    return (double)tms.tv_sec + ((double)tms.tv_nsec)/1e9;
+    return spec2double(&tms);
 }
 
 // thread sleep 
