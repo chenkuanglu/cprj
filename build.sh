@@ -1,1 +1,1 @@
-gcc -o test main.c app/app_init.c -lpthread
+gcc -o test core/start.c core/core.c app/app_init.c -lpthread
