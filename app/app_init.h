@@ -7,20 +7,13 @@
 #ifndef __APP_INIT__
 #define __APP_INIT__
 
-#include <pthread.h>
+#include "../core/core.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct {
-    pid_t       pid;
-    pthread_t   tid;
-    int         argc;
-    char**      argv;
-} start_info_t;
-
-extern void app_init(start_info_t *info);
+#define PRINT_STARTINFO
 
 #ifdef __cplusplus
 }

@@ -4,36 +4,22 @@
  * @brief   main function & start applicatoin
  **/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <pthread.h>
-#include <unistd.h>
-#include "app/app_init.h"
+#include "core.h"
 
-#define PRINT_START_INFO    1
+#ifdef __cplusplus
+extern "C" {
+#endif 
 
+// start info
 static start_info_t start_info;
+// signal mask set
 static sigset_t mask_set;
+// sync signal query thread id
 pthread_t thr_sig;
 
-void* sig_thread(void *arg);
+static void* sig_thread(void *arg);
 
-#if PRINT_START_INFO != 0
-// print argv
-static void print_argv(int argc, char **argv)
-{
-    if (argc <= 1 || argv == NULL) 
-        return;
-
-    printf("arguments: ");
-    for (int i=0; i<argc; i++) {
-        printf("%s ", argv[i]);
-    }
-    printf("\n");
-}
-#endif
-
+// main function
 int main(int argc, char **argv)
 {
     // all sub threads mask signal SIGINT(2) & SIGTERM(15) 
@@ -42,40 +28,36 @@ int main(int argc, char **argv)
     sigaddset(&mask_set, SIGTERM);
     pthread_sigmask(SIG_BLOCK, &mask_set, NULL);
 
+    // start info
     start_info.argc = argc;
     start_info.argv = argv;
     start_info.pid  = getpid();
     start_info.tid  = pthread_self();
+    start_info.tm   = monotime();
 
-#if PRINT_START_INFO != 0
-    printf("process id: %d\n", start_info.pid);
-    print_argv(argc, argv);
-    printf("\n");
-#endif
-
-    if (pthread_create(&thr_sig, 0, sig_thread, 0) != 0) {
+    // create signal query thread
+    if (pthread_create(&thr_sig, NULL, sig_thread, &start_info) != 0) {
         perror("error, 'sig_thread' create");
     }
 
-    // create core thread ...
-    
+    // application init
     app_init(&start_info);
 
-    struct timespec tms = {1, 0};
+    double slp = 1.5;
     for (;;) {
-        printf("nanosleep: 1s...\n");
-        nanosleep(&tms, 0);
+        printf("thrsleep: %.6fs...\n", slp);
+        thrsleep(slp);
     }
 }
 
-// thread signal sync process, SIGTERM & SIGINT should be mask in any thread
-void* sig_thread(void *arg)
+// thread signal sync process, SIGTERM & SIGINT should be mask in any thread!
+static void* sig_thread(void *arg)
 {
+    (void)arg;
     int sig, rc;
     sigset_t sig_set;
     char reason[64] = {0};
 
-    (void)arg;
     pthread_t tid = pthread_self();
     pthread_detach(tid);
 
@@ -89,10 +71,14 @@ void* sig_thread(void *arg)
             printf("\n");
             sprintf(reason, "catch signal '%s'", (sig == SIGTERM) ? "kill" : "ctrl-c");
             printf("exit, reason: %s\n", reason);
-            exit(0);
+            exit(0);    // send sig to main thread
         } else {
             perror("error, 'sigwait()'");
         }
     }
 }
+
+#ifdef __cplusplus
+}
+#endif 
 
