@@ -19,6 +19,12 @@ pthread_t thr_sig;
 
 static void* sig_thread(void *arg);
 
+void __weak app_init(start_info_t *sinfo) 
+{ 
+    (void)sinfo; 
+    printf("no extern app_init()\n");
+}
+
 // main function
 int main(int argc, char **argv)
 {

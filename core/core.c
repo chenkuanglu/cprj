@@ -50,8 +50,6 @@ int thrsleep(double tm)
     return nanosleep(&tms, NULL);
 }
 
-void __weak app_init(start_info_t *sinfo) { (void)sinfo; }
-
 #ifdef __cplusplus
 }
 #endif 
