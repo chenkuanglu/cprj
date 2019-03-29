@@ -36,7 +36,7 @@ extern int      double2spec(double tm, struct timespec *tms);
 extern double   monotime(void);
 extern int      thrsleep(double tm);
 
-void __weak     app_init(start_info_t *sinfo);
+extern void     app_init(start_info_t *sinfo);
 
 #ifdef __cplusplus
 }

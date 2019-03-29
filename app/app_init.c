@@ -17,7 +17,7 @@ static void print_args(int argc, char **argv)
     if (argc <= 1 || argv == NULL) 
         return;
 
-    printf("arguments: ");
+    printf("arguments  : ");
     for (int i=0; i<argc; i++) {
         printf("%s ", argv[i]);
     }
@@ -29,10 +29,10 @@ static void print_args(int argc, char **argv)
 void app_init(start_info_t *sinfo)
 {
 #ifdef PRINT_STARTINFO
-    printf("Process id: %d\n", sinfo->pid);
-    printf("Up time: %.6fs\n", sinfo->tm);
-    printf("\n");
+    printf("process id : %d\n", sinfo->pid);
+    printf("up time    : %.6fs\n", sinfo->tm);
     print_args(sinfo->argc, sinfo->argv);
+    printf("\n");
 #endif
     // init log
 
