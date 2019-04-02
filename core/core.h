@@ -15,6 +15,8 @@
 #include <time.h>
 #include <errno.h>
 
+#include "../lib/timetick.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif 
@@ -29,12 +31,6 @@ typedef struct {
 } start_info_t;
 
 #define __weak  __attribute__((weak))
-
-extern double   spec2double(struct timespec *tms);
-extern int      double2spec(double tm, struct timespec *tms);
-
-extern double   monotime(void);
-extern int      thrsleep(double tm);
 
 #ifdef __cplusplus
 }

@@ -51,8 +51,8 @@ int main(int argc, char **argv)
 
     double slp = 1.5;
     for (;;) {
-        printf("thrsleep: %.6fs...\n", slp);
-        thrsleep(slp);
+        printf("nsleep: %.6fs...\n", slp);
+        nsleep(slp);
     }
 }
 
