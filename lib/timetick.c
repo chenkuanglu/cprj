@@ -13,35 +13,40 @@ extern "C" {
 #endif 
 
 // timespec to double
-double spec2double(struct timespec *tms)
+double* spec2double(const struct timespec *tms, double *tm)
 {
-    if (tms == NULL) {
+    if (tms == NULL || tm == NULL) {
         errno = EINVAL;
-        return -1;
+        return NULL;
     }
-    return (double)tms->tv_sec + ((double)tms->tv_nsec)/1e9;
+    *tm = (double)tms->tv_sec + ((double)tms->tv_nsec)/1e9;
+    return tm;
 }
 
 // double to timespec
-int double2spec(double tm, struct timespec *tms)
+struct timespec* double2spec(double tm, struct timespec *tms)
 {
     if (tms == NULL) {
         errno = EINVAL;
-        return 0;
+        return NULL;
     }
     tms->tv_sec = (time_t)tm;
     tms->tv_nsec = (long)((tm - (long)tm) * 1e9);
-    return 0;
+    return tms;
 }
 
 // get monotonic time clocks 
 double monotime(void)
 {
+    double tm;
     struct timespec tms;
     if (clock_gettime(CLOCK_MONOTONIC, &tms) != 0) {
         return -1;
     }
-    return spec2double(&tms);
+    if (spec2double(&tms, &tm) == NULL) {
+        return -1;
+    }
+    return tm;
 }
 
 // thread sleep 

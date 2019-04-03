@@ -16,6 +16,7 @@
 #include <errno.h>
 
 #include "../lib/timetick.h"
+#include "../lib/err.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,14 +24,12 @@ extern "C" {
 
 // start info
 typedef struct {
-    pid_t       pid;
-    pthread_t   tid;
     int         argc;
     char**      argv;
+    pid_t       pid;
+    pthread_t   tid;
     double      tm;
 } start_info_t;
-
-#define __weak  __attribute__((weak))
 
 #ifdef __cplusplus
 }

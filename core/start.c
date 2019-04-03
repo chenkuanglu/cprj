@@ -10,12 +10,14 @@
 extern "C" {
 #endif 
 
+#define __weak  __attribute__((weak))
+
 // start info
 static start_info_t start_info;
 // signal mask set
 static sigset_t mask_set;
 // sync signal query thread id
-pthread_t thr_sig;
+static pthread_t thr_sig;
 
 static void* sig_thread(void *arg);
 
@@ -45,6 +47,12 @@ int main(int argc, char **argv)
     if (pthread_create(&thr_sig, NULL, sig_thread, &start_info) != 0) {
         perror("error, 'sig_thread' create");
     }
+
+    // core init
+    err_add(256, "test error");
+    char errbuf[128];
+    printf("errno 256: %s\n", err_string(256, errbuf, 128));
+    printf("errno 1: %s\n", err_string(1, errbuf, 128));
 
     // application init
     app_init(&start_info);

@@ -10,8 +10,7 @@
 extern "C" {
 #endif 
 
-// print argv
-#ifdef PRINT_STARTINFO
+// print args
 static void print_args(int argc, char **argv)
 {
     if (argc <= 1 || argv == NULL) 
@@ -23,7 +22,6 @@ static void print_args(int argc, char **argv)
     }
     printf("\n");
 }
-#endif
 
 // application init
 void app_init(start_info_t *sinfo)

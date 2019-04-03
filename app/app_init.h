@@ -4,16 +4,14 @@
  * @brief   application init
  **/
 
-#ifndef __APP_INIT__
-#define __APP_INIT__
+#ifndef __APP_INIT_H__
+#define __APP_INIT_H__
 
 #include "../core/core.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define PRINT_STARTINFO
 
 #ifdef __cplusplus
 }
