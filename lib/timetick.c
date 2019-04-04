@@ -1,5 +1,5 @@
 /**
- * @file    time_tick.c
+ * @file    timetick.c
  * @author  ln
  * @brief   time & ticks 
  **/

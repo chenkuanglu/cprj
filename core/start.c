@@ -19,7 +19,7 @@ static sigset_t mask_set;
 // sync signal query thread id
 static pthread_t thr_sig;
 
-static void* sig_thread(void *arg);
+static void* thread_sig(void *arg);
 
 void __weak app_init(start_info_t *sinfo) 
 { 
@@ -44,8 +44,8 @@ int main(int argc, char **argv)
     start_info.tm   = monotime();
 
     // create signal query thread
-    if (pthread_create(&thr_sig, NULL, sig_thread, &start_info) != 0) {
-        perror("error, 'sig_thread' create");
+    if (pthread_create(&thr_sig, NULL, thread_sig, &start_info) != 0) {
+        perror("error, 'thread_sig' create");
     }
 
     // core init
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 }
 
 // thread signal sync process, SIGTERM & SIGINT should be mask in any thread!
-static void* sig_thread(void *arg)
+static void* thread_sig(void *arg)
 {
     (void)arg;
     int sig, rc;
