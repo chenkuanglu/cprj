@@ -49,17 +49,17 @@ int main(int argc, char **argv)
     }
 
     // core init
-    err_add(256, "test error");
+    err_init();
     char errbuf[128];
-    printf("errno 256: %s\n", err_string(256, errbuf, 128));
-    printf("errno 1: %s\n", err_string(1, errbuf, 128));
+    loge("errno 256: %s\n", err_string(256, errbuf, 128));
+    loge("errno 1: %s\n", err_string(1, errbuf, 128));
 
     // application init
     app_init(&start_info);
 
     double slp = 1.5;
     for (;;) {
-        printf("nsleep: %.6fs...\n", slp);
+        logi("nsleep: %.6fs...\n", slp);
         nsleep(slp);
     }
 }

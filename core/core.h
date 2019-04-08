@@ -17,6 +17,7 @@
 
 #include "../lib/timetick.h"
 #include "../lib/err.h"
+#include "../lib/log.h"
 
 #ifdef __cplusplus
 extern "C" {

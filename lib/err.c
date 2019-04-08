@@ -10,8 +10,17 @@
 extern "C" {
 #endif 
 
-const char unknown_str[] = "unknown error";
+const char unknown_str[] = "Unknown error";
 static char* errtbl[LIB_ERRNO_MAX_NUM] = {0};
+
+int err_init(void)
+{
+    err_add(LIB_ERRNO_QUE_EMPTY, "Queue empty");
+    err_add(LIB_ERRNO_QUE_FULL, "Queue full");
+    err_add(LIB_ERRNO_MEM_ALLOC, "Malloc fail");
+    err_add(LIB_ERRNO_MEM_OUT, "Memory out");
+    return 0;
+}
 
 // add new item {errnum,str} to list
 int err_add(int errnum, const char *str)
