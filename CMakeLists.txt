@@ -6,6 +6,7 @@ aux_source_directory(./core DIR_SRCS)
 aux_source_directory(./lib DIR_SRCS)
 
 link_libraries(pthread)
+link_libraries(curl)
 
 add_executable(cprj ${DIR_SRCS})
 

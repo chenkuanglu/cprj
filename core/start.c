@@ -28,12 +28,6 @@ void app_init(start_info_t *sinfo)
 // main function
 int main(int argc, char **argv)
 {
-    // all sub threads mask signal SIGINT(2) & SIGTERM(15) 
-    sigemptyset(&mask_set);
-    sigaddset(&mask_set, SIGINT);
-    sigaddset(&mask_set, SIGTERM);
-    pthread_sigmask(SIG_BLOCK, &mask_set, NULL);
-
     // start info
     start_info.argc = argc;
     start_info.argv = argv;
@@ -45,9 +39,11 @@ int main(int argc, char **argv)
     core_init();   
     clog = core_getlog();
 
-    char errbuf[128];
-    sloge(clog, "%s\n", err_string(256, errbuf, 128));
-    sloge(clog, "%s\n", err_string(1, errbuf, 128));
+    // all sub threads mask signal SIGINT(2) & SIGTERM(15) 
+    sigemptyset(&mask_set);
+    sigaddset(&mask_set, SIGINT);
+    sigaddset(&mask_set, SIGTERM);
+    pthread_sigmask(SIG_BLOCK, &mask_set, NULL);
 
     // create signal query thread
     if (pthread_create(&thr_sig, NULL, thread_sig, &start_info) != 0) {
@@ -57,10 +53,8 @@ int main(int argc, char **argv)
     // application init
     app_init(&start_info);
 
-    double slp = 1.5;
     for (;;) {
-        slogi(clog, "nsleep: %.6fs...\n", slp);
-        nsleep(slp);
+        nsleep(60);
     }
 }
 

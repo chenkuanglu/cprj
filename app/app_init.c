@@ -5,10 +5,13 @@
  **/
 
 #include "app_init.h"
+#include "trigg_miner.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif 
+
+#define PRINT_STARTINFO
 
 // print args
 static void print_args(int argc, char **argv)
@@ -32,10 +35,9 @@ void app_init(start_info_t *sinfo)
     print_args(sinfo->argc, sinfo->argv);
     printf("\n");
 #endif
-    // init log
-
-    // your code here
-    // ...
+    
+    // Your code here...
+    trigg_init(sinfo);
 }
 
 #ifdef __cplusplus
