@@ -27,10 +27,14 @@ extern "C" {
 typedef struct {
     int         argc;
     char**      argv;
-    pid_t       pid;
-    pthread_t   tid;
-    double      tm;
+
+    pid_t       pid;        // pid of process
+    pthread_t   tid;        // thread id of main thread
+    double      tm;         // time of app startup
 } start_info_t;
+
+extern int          core_init(void);
+extern log_cb_t*    core_getlog(void);
 
 #ifdef __cplusplus
 }

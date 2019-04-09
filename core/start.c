@@ -10,21 +10,19 @@
 extern "C" {
 #endif 
 
-#define __weak  __attribute__((weak))
+static start_info_t start_info;     // start info
+static sigset_t mask_set;           // signal mask set
+static pthread_t thr_sig;           // sync signal query thread id
 
-// start info
-static start_info_t start_info;
-// signal mask set
-static sigset_t mask_set;
-// sync signal query thread id
-static pthread_t thr_sig;
+static log_cb_t *clog;              // use core log to print
 
 static void* thread_sig(void *arg);
 
-void __weak app_init(start_info_t *sinfo) 
+__attribute__((weak)) 
+void app_init(start_info_t *sinfo) 
 { 
-    (void)sinfo; 
-    printf("no extern app_init()\n");
+    (void)sinfo;
+    sloge(clog, "No extern app_init()\n");
 }
 
 // main function
@@ -42,24 +40,26 @@ int main(int argc, char **argv)
     start_info.pid  = getpid();
     start_info.tid  = pthread_self();
     start_info.tm   = monotime();
+    
+    // core init
+    core_init();   
+    clog = core_getlog();
+
+    char errbuf[128];
+    sloge(clog, "%s\n", err_string(256, errbuf, 128));
+    sloge(clog, "%s\n", err_string(1, errbuf, 128));
 
     // create signal query thread
     if (pthread_create(&thr_sig, NULL, thread_sig, &start_info) != 0) {
-        perror("error, 'thread_sig' create");
+        sloge(clog, "create 'thread_sig' fail");
     }
-
-    // core init
-    err_init();
-    char errbuf[128];
-    loge("errno 256: %s\n", err_string(256, errbuf, 128));
-    loge("errno 1: %s\n", err_string(1, errbuf, 128));
 
     // application init
     app_init(&start_info);
 
     double slp = 1.5;
     for (;;) {
-        logi("nsleep: %.6fs...\n", slp);
+        slogi(clog, "nsleep: %.6fs...\n", slp);
         nsleep(slp);
     }
 }
@@ -83,11 +83,12 @@ static void* thread_sig(void *arg)
         rc = sigwait(&sig_set, &sig);
         if (rc == 0) {
             printf("\n");
-            sprintf(reason, "catch signal '%s'", (sig == SIGTERM) ? "kill" : "ctrl-c");
-            printf("exit, reason: %s\n", reason);
+            sprintf(reason, "catch signal '%s'", (sig == SIGTERM) ? "kill" : "Ctrl-C");
+            slogn(clog, "exit, %s\n", reason);
             exit(0);    // send sig to main thread
         } else {
-            perror("error, 'sigwait()'");
+            sloge(clog, "'sigwait()' fail");
+            nsleep(0.1);
         }
     }
 }
