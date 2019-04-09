@@ -10,6 +10,7 @@ add_definitions("-DPRINT_ARGS")
 
 link_libraries(pthread)
 link_libraries(curl)
+link_libraries(m)
 
 add_executable(cprj ${DIR_SRCS})
 

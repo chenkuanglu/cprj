@@ -22,7 +22,7 @@ __attribute__((weak))
 void app_init(start_info_t *sinfo) 
 { 
     (void)sinfo;
-    sloge(clog, "No extern app_init()\n");
+    slogw(clog, "No extern app_init()\n");
 }
 
 // main function
@@ -45,16 +45,29 @@ int main(int argc, char **argv)
     sigaddset(&mask_set, SIGTERM);
     pthread_sigmask(SIG_BLOCK, &mask_set, NULL);
 
+    if (thrq_init(&start_info.tq) != 0) {
+        sloge(clog, "thrq_init() fail");
+        return 0;
+    }
+
     // create signal query thread
     if (pthread_create(&thr_sig, NULL, thread_sig, &start_info) != 0) {
         sloge(clog, "create 'thread_sig' fail");
+        return 0;
     }
 
     // application init
     app_init(&start_info);
 
+    int cmd;
     for (;;) {
-        nsleep(60);
+        if (thrq_receive(&start_info.tq, &cmd, sizeof(cmd), 0) != 0) {
+            nsleep(0.1);
+            continue;
+        }
+        slogd(clog, "main thread get cmd: %d (0x%08x)", cmd, cmd);
+        //thr_cancel_all(0);
+        exit(0);
     }
 }
 
