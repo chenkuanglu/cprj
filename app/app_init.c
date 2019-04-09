@@ -11,32 +11,41 @@
 extern "C" {
 #endif 
 
-#define PRINT_STARTINFO
+log_cb_t *init_log;
 
-// print args
+#ifdef PRINT_ARGS
 static void print_args(int argc, char **argv)
 {
+    int sum, num;
+    char *buf;
+    const char *pre = "Arguments: ";
     if (argc <= 1 || argv == NULL) 
         return;
-
-    printf("arguments  : ");
+    sum = strlen(pre);
     for (int i=0; i<argc; i++) {
-        printf("%s ", argv[i]);
+        sum += strlen(argv[i]);
     }
-    printf("\n");
+    if ((buf = (char *)malloc(sum+1)) == NULL)
+        return;
+    num = sprintf(buf, "%s", pre);
+    for (int i=0; i<argc; i++) {
+        num += sprintf(buf+num, "%s ", argv[i]);
+    }
+    slogi(init_log, "%s", buf);
+    free(buf);
 }
+#endif
 
 // application init
 void app_init(start_info_t *sinfo)
 {
-#ifdef PRINT_STARTINFO
-    printf("process id : %d\n", sinfo->pid);
-    printf("up time    : %.6fs\n", sinfo->tm);
+    init_log = core_getlog();
+
+#ifdef PRINT_ARGS
     print_args(sinfo->argc, sinfo->argv);
     printf("\n");
 #endif
     
-    // Your code here...
     trigg_init(sinfo);
 }
 
