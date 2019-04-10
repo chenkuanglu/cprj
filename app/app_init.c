@@ -40,6 +40,7 @@ static void print_args(int argc, char **argv)
 void app_init(start_info_t *sinfo)
 {
     init_log = core_getlog();
+    slogd(init_log, "app init...\n");
 
 #ifdef PRINT_ARGS
     print_args(sinfo->argc, sinfo->argv);
@@ -47,6 +48,11 @@ void app_init(start_info_t *sinfo)
 #endif
     
     trigg_init(sinfo);
+}
+
+void app_proper_exit(int ec)
+{
+    slogd(init_log, "app_proper_exit(%d)...\n", ec);
 }
 
 #ifdef __cplusplus

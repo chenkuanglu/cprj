@@ -35,14 +35,7 @@ int core_init(void)
 
 void core_proper_exit(int ec)
 {
-    sloge(&core_info.log, "core_proper_exit(%d)...\n", ec);
-    //thrq_send() to main thread
-}
-
-int thr_new(const char *name, pthread_t *tid, const pthread_attr_t *attr, core_thread_t fn, void *arg)
-{
-    (void)name;
-    return pthread_create(tid, attr, fn, arg);
+    slogd(&core_info.log, "core_proper_exit(%d)...\n", ec);
 }
 
 #ifdef __cplusplus

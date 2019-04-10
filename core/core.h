@@ -38,12 +38,15 @@ typedef struct {
 
 typedef void* (*core_thread_t)(void *);
 
+#define CORE_THR_RETIRE()       do {\
+                                    for (;;) nsleep(60);\
+                                } while (0)
+
 extern int          core_init(void);
 extern log_cb_t*    core_getlog(void);
 extern void         core_proper_exit(int ec);
 
-// default kill seq is 'reverse list', if no callback exit func
-extern int          thr_new(const char *name, pthread_t *tid, const pthread_attr_t *attr, core_thread_t fn, void *arg);
+extern void         process_proper_exit(int ec);
 
 #ifdef __cplusplus
 }
