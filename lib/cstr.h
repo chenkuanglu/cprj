@@ -29,7 +29,6 @@ extern char*    strlwr          (char *s);
 extern char*    strupr          (char *s);
 
 extern int      strstrip        (char *s);
-extern char*    strline         (char **str);
 
 extern int      bin2hex         (char *hex, const void *bin, unsigned len);
 extern char*    abin2hex        (const void *bin, unsigned len);

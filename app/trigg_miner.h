@@ -66,6 +66,9 @@ extern trigg_miner_t triggm;
 extern int trigg_init(start_info_t *sinfo);
 extern int trigg_download_lst(void);
 
+extern uint32_t str2ip(char *addrstr);
+extern int nodesl_to_coreipl(char *nodesl, uint32_t *coreipl);
+
 #ifdef __cplusplus
 }
 #endif

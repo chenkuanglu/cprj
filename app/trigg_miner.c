@@ -6,6 +6,11 @@
 
 #include <curl/curl.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
 #include "trigg_miner.h"
 
 #ifdef __cplusplus
@@ -65,7 +70,7 @@ void* thread_trigg_miner(void *arg)
             }
         }
 
-        slogd(triggm.log, "tiime to check uart msg timeout...\n");
+        slogd(triggm.log, "time to check uart msg timeout...\n");
         // submit cur tbl , not new tbl
     }
 }
@@ -81,10 +86,23 @@ void* thread_trigg_pool(void *arg)
     if (access(triggm.nodes_lst.filename, R_OK) != 0) {
         slogd(triggm.log, "No file '%s'\n", triggm.nodes_lst.filename);
         trigg_download_lst();
+    } else {
+        char fbuf[1024];
+        FILE *fp = fopen(triggm.nodes_lst.filename, "r");
+        memset(fbuf, 0, sizeof(fbuf));
+        if (fp) {
+            triggm.nodes_lst.len = fread(fbuf, 1, sizeof(fbuf)-1, fp);
+            fclose(fp);
+            triggm.nodes_lst.filedata = (char *)malloc(triggm.nodes_lst.len+1);
+            memset(triggm.nodes_lst.filedata, 0, triggm.nodes_lst.len+1);
+            memcpy(triggm.nodes_lst.filedata, fbuf, triggm.nodes_lst.len);
+        }
     }
 #else 
     trigg_download_lst();
 #endif
+
+    nodesl_to_coreipl(triggm.nodes_lst.filedata, triggm.candidate.coreip_lst);
 
     int cmd;
     for (;;) {
@@ -118,31 +136,29 @@ void* thread_trigg_pool(void *arg)
     }
 }
 
+// covert string(domain or IPv4 numbers-and-dots notation) to binary ip
 uint32_t str2ip(char *addrstr)
 {
+    if (addrstr == NULL) 
+        return 0;
+
     struct hostent *host;
     struct sockaddr_in addr;
-
-    if (addrstr == NULL) return 0;
-
     memset(&addr, 0, sizeof(addr));
-    if (addrstr[0] < '0' || addrstr[0] > '9') {
-        host = gethostbyname(addrstr);
-        if (host == NULL) {
-            printf("str2ip(): gethostbyname() failed\n");
-            return 0;
-        }
-        memcpy((char *) &(addr.sin_addr.s_addr),
-                host->h_addr_list[0], host->h_length);
-    }
-    else
-        addr.sin_addr.s_addr = inet_addr(addrstr);
 
+    if (addrstr[0] < '0' || addrstr[0] > '9') {
+        if ((host = gethostbyname(addrstr)) == NULL)
+            return 0;
+        else
+            memcpy((char *)&(addr.sin_addr.s_addr), host->h_addr_list[0], host->h_length);
+    } else {
+        addr.sin_addr.s_addr = inet_addr(addrstr);
+    }
     return addr.sin_addr.s_addr;
 }
 
 // convert nodes lst to core ip lst
-int nodesl_to_coreipl(char *nodesl, uint32_t *cpl)
+int nodesl_to_coreipl(char *nodesl, uint32_t *coreipl)
 {
     int j;
     char *addrstr, *line;
@@ -151,24 +167,26 @@ int nodesl_to_coreipl(char *nodesl, uint32_t *cpl)
     if (nodesl == NULL || *nodesl == '\0') 
         return -1;
 
-    char *list = strdup(nodesl);
-    for (j = 0; j < TRIGG_CORELIST_LEN; ) {
-        if ((line = strline(&list)) == NULL) {
-            free(list);
+    char *str = strdup(nodesl);
+    if (str == NULL)
+        return -1;
+    char *sep = str;
+    for (j=0; j<TRIGG_CORELIST_LEN; ) {
+        if ((line = strsep(&sep, "\n")) == NULL) {
             break;
         }
         if (*line == '#') 
             continue;
-        addrstr = strtok(line, " \r\n\t");
-        slogd(triggm.log, "parse ip string '%s'\n", addrstr);
-        if (addrstr == NULL) {
-            free(list);
+        if ((addrstr = strtok(line, " \r\n\t")) == NULL) {
             break;
         }
-        ip = str2ip(addrstr);
-        if (!ip) continue;
-        cpl[j++] = ip;
+        if ((ip = str2ip(addrstr)) == 0)
+            continue;
+        slogd(triggm.log, "Convert string '%s' \tto IPs[%02d] 0x%08x\n", addrstr, j, ip);
+        coreipl[j++] = ip;
     }
+
+    free(str);
     return j;
 }
 
@@ -185,7 +203,7 @@ static size_t trigg_curl_write_nodes(void *src, size_t size, size_t nmemb, void 
     memcpy((char*)triggm.nodes_lst.filedata + triggm.nodes_lst.len, src, len);
     triggm.nodes_lst.len += len;
     triggm.nodes_lst.filedata[triggm.nodes_lst.len] = '\0';
-    slogd(triggm.log, "download %d bytes from url '%s'", triggm.nodes_lst.len, triggm.nodes_lst.url);
+    slogd(triggm.log, "download %d bytes from url '%s'\n", triggm.nodes_lst.len, triggm.nodes_lst.url);
 
     return len;
 }
@@ -203,12 +221,12 @@ int trigg_download_lst(void)
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, triggm.nodes_lst.filedata);
     CURLcode res = curl_easy_perform(curl);
     if (CURLE_OK != res) {
-        sloge(triggm.log, "curl_easy_perform() fail: %s\n", err_string(errno, errbuf, 128));
+        sloge(triggm.log, "curl_easy_perform() fail: %s\n", err_string(res, errbuf, 128));
         return -1;
     }
     curl_easy_cleanup(curl);
 
-    slogd(triggm.log, "peer IPs from url '%s':\n%s\n", triggm.nodes_lst.url, triggm.nodes_lst.filedata);
+    slogd(triggm.log, "peer IPs from url '%s':\n%s", triggm.nodes_lst.url, triggm.nodes_lst.filedata);
     FILE *fp = fopen(triggm.nodes_lst.filename, "w+");
     if (fp) {
         slogd(triggm.log, "write nodes list to file '%s'\n", triggm.nodes_lst.filename);
