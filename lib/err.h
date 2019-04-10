@@ -19,7 +19,7 @@ extern "C" {
 
 // error number: 0 ~ 1023
 #define LIB_ERRNO_BASE              256
-#define LIB_ERRNO_MAX_NUM           (1024-256)
+#define LIB_ERRNO_MAX_NUM           (1024 - LIB_ERRNO_BASE)
 
 #define LIB_ERRNO_QUE_EMPTY         (LIB_ERRNO_BASE + 0)
 #define LIB_ERRNO_QUE_FULL          (LIB_ERRNO_BASE + 1)

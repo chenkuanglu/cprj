@@ -72,6 +72,24 @@ int strstrip(char *s)
 }
 
 /**
+ * @brief   Get one line from string buffer
+ * @param   str     String buffer, data of str will be modified!!!
+ * @return  The new/next line
+ **/
+char *strline(char **str)
+{
+    if ((str == NULL) || *(*str) == '\0')
+        return NULL;
+    char *s = *str;
+    while (*(*str) != '\0' || *(*str) != '\n') {
+        (*str)++;
+    }
+    *(*str) = '\0';
+    (*str)++;
+    return s;
+}
+
+/**
  * @brief   Convert bin to hex
  * @param   hex         Output string buffer
  *          bin         bin to convert
