@@ -37,6 +37,12 @@ int trigg_init(start_info_t *sinfo)
 
     mux_init(&triggm.cand_lock);
 
+    time_t stime = 0x12345678;
+    //time(&stime);
+    srand16(stime);
+    srand2(stime, 0, 0);
+    triggm.retry_num = 5;
+
     if (pthread_create(&triggm.thr_miner, NULL, thread_trigg_miner, &triggm) != 0) {
         sloge(triggm.log, "create 'thread_trigg_miner' fail: %s\n", strerror(errno));
         return -1;
@@ -69,9 +75,47 @@ void* thread_trigg_miner(void *arg)
                 continue;
             }
         }
+    }
+}
 
-        slogd(triggm.log, "time to check uart msg timeout...\n");
-        // submit cur tbl , not new tbl
+int trigg_coreipl_copy(uint32_t *dst, uint32_t *src)
+{
+    if (dst == NULL || src == NULL)
+        return -1;
+    for (int i=0; i<TRIGG_CORELIST_LEN; i++) {
+        dst[i] = src[i];
+    }
+    return 0;
+}
+
+int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src)
+{
+    if (trigg_coreipl_copy(dst->coreip_lst, src->coreip_lst) != 0)
+        return -1;
+    dst->coreip_ix = src->coreip_ix;
+    if (dst->cand_data)
+        free(dst->cand_data);
+    if ((dst->cand_data = (char *)malloc(src->cand_len)) == NULL) 
+        return -1;
+    memcpy(dst->cand_data, src->cand_data, dst->cand_len);
+    dst->cand_trailer = src->cand_trailer;
+    dst->cand_len = src->cand_len;
+    dst->cand_tm = src->cand_tm;
+    return 0;
+}
+
+void trigg_coreip_shuffle(uint32_t *list, uint32_t len)
+{
+    uint32_t *ptr, *p2, temp, ix;
+
+    if (len < 2) 
+        return;
+    for (ptr = &list[len - 1]; len > 1; len--, ptr--) {
+        ix = rand16() % len;
+        p2 = &list[ix];
+        temp = *ptr;
+        *ptr = *p2;
+        *p2 = temp;
     }
 }
 
@@ -79,35 +123,16 @@ void* thread_trigg_pool(void *arg)
 {
     (void)arg;
     char ebuf[128];
-    double tm_nlst = monotime();
-    double tm_job = monotime();
+    double que_tout = 1.0;
+    double tm_nlst = 0;
+    double tm_cand = 0;
+    trigg_cand_t cand;
+    memset(&cand, 0, sizeof(cand));
     
-#ifdef DEBUG
-    if (access(triggm.nodes_lst.filename, R_OK) != 0) {
-        slogd(triggm.log, "No file '%s'\n", triggm.nodes_lst.filename);
-        trigg_download_lst();
-    } else {
-        char fbuf[1024];
-        FILE *fp = fopen(triggm.nodes_lst.filename, "r");
-        memset(fbuf, 0, sizeof(fbuf));
-        if (fp) {
-            triggm.nodes_lst.len = fread(fbuf, 1, sizeof(fbuf)-1, fp);
-            fclose(fp);
-            triggm.nodes_lst.filedata = (char *)malloc(triggm.nodes_lst.len+1);
-            memset(triggm.nodes_lst.filedata, 0, triggm.nodes_lst.len+1);
-            memcpy(triggm.nodes_lst.filedata, fbuf, triggm.nodes_lst.len);
-        }
-    }
-#else 
-    trigg_download_lst();
-#endif
-
-    nodesl_to_coreipl(triggm.nodes_lst.filedata, triggm.candidate.coreip_lst);
-
     int cmd;
     for (;;) {
         cmd = 0;
-        if (thrq_receive(&triggm.thrq_pool, &cmd, sizeof(cmd), 1.0) < 0) {  // 1s timeout
+        if (thrq_receive(&triggm.thrq_pool, &cmd, sizeof(cmd), que_tout) < 0) {  // 1s timeout
             if (errno != ETIMEDOUT) {
                 sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
                 nsleep(0.1);
@@ -116,7 +141,8 @@ void* thread_trigg_pool(void *arg)
         }
 
         switch (cmd) {
-            case 0:     // nothing
+            case 0:     // thrq receive timeout
+                slogd(triggm.log, "Thread pool %.3fs timeout\n", que_tout);
                 break;
             case 1:     // start/top miner ?
                 break;
@@ -124,14 +150,38 @@ void* thread_trigg_pool(void *arg)
                 break;
         }
 
-        if (monotime() - tm_nlst > 3600) {              // update nodes list every 1h
-            slogd(triggm.log, "update triggm.nodes_lst\n");
-            trigg_download_lst();
+        // update nodes list every 1h
+        if (tm_nlst == 0 || monotime() - tm_nlst > 3600) {
+            int retry = triggm.retry_num;
+            while (trigg_download_lst() != 0) {
+                if (--retry <= 0)
+                    process_proper_exit(errno);
+            }
             tm_nlst = monotime();
+
+            cand.coreip_ix = 0;
+            memset(cand.coreip_lst, 0, sizeof(cand.coreip_lst));
+            trigg_nodesl_to_coreipl(triggm.nodes_lst.filedata, cand.coreip_lst);
+            trigg_coreip_shuffle(cand.coreip_lst, TRIGG_CORELIST_LEN);
+            for (int i=0; i<TRIGG_CORELIST_LEN; i++) {
+                if (cand.coreip_lst[i] != 0)
+                    slogd(triggm.log, "Shuffled IPs[%02d] 0x%08x\n", i, cand.coreip_lst[i]);
+            }
         }
-        if (monotime() - tm_job > 10) {                 // get new job from pool every 10s
-            slogd(triggm.log, "get new job\n");
-            tm_job = monotime();
+
+        // get new job from pool every 10s
+        if (tm_cand == 0 || monotime() - tm_cand > 10) {
+            int retry = triggm.retry_num;
+            while (trigg_get_cblock(&cand) != 0) {
+                if (--retry <= 0)
+                    process_proper_exit(errno);
+            }
+            tm_cand = monotime();
+
+            // compare blk num ???
+            mux_lock(&triggm.cand_lock);
+            trigg_cand_copy(&triggm.candidate, &cand);
+            mux_unlock(&triggm.cand_lock);
         }
     }
 }
@@ -158,7 +208,7 @@ uint32_t str2ip(char *addrstr)
 }
 
 // convert nodes lst to core ip lst
-int nodesl_to_coreipl(char *nodesl, uint32_t *coreipl)
+int trigg_nodesl_to_coreipl(char *nodesl, uint32_t *coreipl)
 {
     int j;
     char *addrstr, *line;
@@ -221,6 +271,7 @@ int trigg_download_lst(void)
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, triggm.nodes_lst.filedata);
     CURLcode res = curl_easy_perform(curl);
     if (CURLE_OK != res) {
+        errno = res;
         sloge(triggm.log, "curl_easy_perform() fail: %s\n", err_string(res, errbuf, 128));
         return -1;
     }
