@@ -13,9 +13,6 @@
 extern "C" {
 #endif
 
-#define TRIGG_CORELIST_LEN      32
-#define TRIGG_HASH_LEN          32
-
 #define TXADDRLEN               2208
 #define TXAMOUNT                8
 #define TXSIGLEN                2144  /* WOTS */
@@ -35,6 +32,24 @@ extern "C" {
 #define OP_RESOLVE        14
 #define OP_GET_CBLOCK     15
 #define OP_MBLOCK         16
+
+#define TXNETWORK 0x0539
+#define TXEOT     0xabcd
+#define TXADDRLEN 2208
+#define TXAMOUNT  8
+#define TXSIGLEN  2144  /* WOTS */
+#define HASHLEN 32
+#define TXAMOUNT 8
+#define TXBUFF(tx)   ((uint8_t *) tx)
+#define TXBUFFLEN    ((2*5) + (8*2) + 32 + 32 + 32 + 2 + (TXADDRLEN*3) + (TXAMOUNT*3) + TXSIGLEN + (2+2))
+#define TRANBUFF(tx) ((tx)->src_addr)
+#define TRANLEN      ( (TXADDRLEN*3) + (TXAMOUNT*3) + TXSIGLEN )
+#define CRC_BUFF(tx) TXBUFF(tx)
+#define CRC_COUNT   (TXBUFFLEN - (2+2))  /* tx buff less crc and trailer */
+#define CRC_VAL_PTR(tx)  ((tx)->crc16)
+
+#define CORELISTLEN      32
+#define HASHLEN          32
 
 /* Communications Protocol Definitions*/
 typedef struct {
@@ -76,24 +91,25 @@ typedef struct {
 
 /* The block trailer at end of block file */
 typedef struct {
-    uint8_t phash[TRIGG_HASH_LEN];      /* previous block hash (32) */
+    uint8_t phash[HASHLEN];      /* previous block hash (32) */
     uint8_t bnum[8];                    /* this block number */
     uint8_t mfee[8];                    /* transaction fee */
     uint8_t tcount[4];                  /* transaction count */
     uint8_t time0[4];                   /* to compute next difficulty */
     uint8_t difficulty[4];
-    uint8_t mroot[TRIGG_HASH_LEN];      /* hash of all TXQENTRY's */
-    uint8_t nonce[TRIGG_HASH_LEN];
+    uint8_t mroot[HASHLEN];      /* hash of all TXQENTRY's */
+    uint8_t nonce[HASHLEN];
     uint8_t stime[4];                   /* unsigned start time GMT seconds */
-    uint8_t bhash[TRIGG_HASH_LEN];      /* hash of all block less bhash[] */
+    uint8_t bhash[HASHLEN];      /* hash of all block less bhash[] */
 } btrailer_t;
 
 typedef struct {
-    uint32_t    coreip_lst[TRIGG_CORELIST_LEN];
+    uint32_t    coreip_lst[CORELISTLEN];
     int         coreip_ix;
 
     char        *cand_data;
     btrailer_t  *cand_trailer;
+    char        cand_bnum[8];
     int         cand_len;
     double      cand_tm;
 } trigg_cand_t;
@@ -135,6 +151,7 @@ extern uint32_t srand16(uint32_t x);
 extern void srand2(uint32_t x, uint32_t y, uint32_t z);
 extern uint32_t rand16(void);
 
+extern uint16_t crc16(void *buff, int len);
 
 #ifdef __cplusplus
 }
