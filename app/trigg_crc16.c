@@ -9,7 +9,8 @@
  *
  */
 
-#include <stdint.h>
+#include "trigg_crc16.h"
+
 
 uint16_t Crc16table[] = {
    0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7, 
@@ -50,8 +51,6 @@ uint16_t Crc16table[] = {
  * crc is unsigned 16-bit, c is unsigned 8-bit.
  * Initial crc = 0
  */
-#define update_crc16(crc, c) \
-   ( ((uint16_t) (crc) << 8) ^ Crc16table[ ((uint16_t) (crc) >> 8) ^ (uint8_t) (c) ] )
 
 /* Compute CRC-CCITT on buff */
 uint16_t crc16(void *buff, int len)
@@ -64,3 +63,4 @@ uint16_t crc16(void *buff, int len)
 
    return crc;
 }
+

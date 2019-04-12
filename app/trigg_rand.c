@@ -7,7 +7,7 @@
  *
 */
 
-#include <stdint.h>
+#include "trigg_rand.h"
 
 #ifdef __cplusplus
 extern "C" {

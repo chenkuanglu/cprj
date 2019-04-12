@@ -17,7 +17,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "../config.h"  /* to check for LONG64 */
 #include "sha256.h"
 
 /* LOCAL MACROS */
@@ -210,3 +209,4 @@ void sha256(const byte *in, int inlen, byte *hashout)
    sha256_update(&ctx, in, inlen);
    sha256_final(&ctx, hashout);
 }
+

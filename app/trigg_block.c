@@ -4,8 +4,10 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#include "trigg_miner.h"
+#include "trigg_block.h"
 #include "trigg_util.h"
+#include "trigg_rand.h"
+#include "trigg_crc16.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,7 +29,7 @@ SOCKET connectip(uint32_t ip, double tout)
 	uint16_t port;
 	double timeout;
 	if ((sd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-		sloge(triggm.log, "socket() open fail: %s", strerror(errno));
+		//loge("socket() open fail: %s", strerror(errno));
 		return INVALID_SOCKET;
 	}
 	port = PORT;
@@ -123,7 +125,7 @@ int callserver(NODE *np, trigg_cand_t *cand, double timeout)
     send_op(np, OP_HELLO);
     int ecode = rx2(np, 0, timeout);
     if(ecode != VEOK) {
-        sloge(triggm.log, "Missing HELLO_ACK packet (%d)", ecode);
+        //loge("Missing HELLO_ACK packet (%d)", ecode);
 bad:
         close(np->sd);
         np->sd = INVALID_SOCKET;
@@ -133,7 +135,7 @@ bad:
     np->id2 = get16(np->tx.id2);
     np->opcode = get16(np->tx.opcode);
     if(np->opcode != OP_HELLO_ACK) {
-        sloge(triggm.log, "HELLO_ACK is wrong: %d", np->opcode);
+        //loge("HELLO_ACK is wrong: %d", np->opcode);
         goto bad;
     }
     put64(cand->cand_bnum, np->tx.cblock);  // copy blocknum

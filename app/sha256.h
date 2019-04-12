@@ -47,3 +47,4 @@ void sha256_final(SHA256_CTX *ctx, byte hash[]);  /* hash is 32 bytes */
 void sha256(const byte *in, int inlen, byte *hashout);
 
 #endif   /* SHA256_H */
+

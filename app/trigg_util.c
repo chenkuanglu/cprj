@@ -1,4 +1,4 @@
-/* util.cpp Miscellaneous Utilities
+/* util.c Miscellaneous Utilities
  *
  * Copyright (c) 2019 by Adequate Systems, LLC.  All Rights Reserved.
  * See LICENSE.PDF   **** NO WARRANTY ****
@@ -9,6 +9,10 @@
 */
 
 #include "trigg_miner.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif 
 
 uint16_t get16(void *buff)
 {
@@ -62,38 +66,12 @@ void shuffle32(uint32_t *list, uint32_t len)
 	}
 }
 
-void fatal(char *fmt, ...)
-{
-	va_list argp;
-
-	fprintf(stdout, "miner3: ");
-	va_start(argp, fmt);
-	vfprintf(stdout, fmt, argp);
-	va_end(argp);
-	printf("\n");
-#ifdef _WINSOCKAPI_
-	if (Needcleanup)
-		WSACleanup();
-#endif
-	exit(2);
-}
-
 char *ntoa(uint8_t *a)
 {
 	static char s[24];
 
 	sprintf(s, "%d.%d.%d.%d", a[0], a[1], a[2], a[3]);
 	return s;
-}
-
-int exists(char *fname)
-{
-	FILE *fp;
-
-	fp = fopen(fname, "rb");
-	if (!fp) return 0;
-	fclose(fp);
-	return 1;
 }
 
 char *bnum2hex(uint8_t *bnum)
@@ -146,3 +124,8 @@ int patch_addr(char *cblock, char *addrfile)
 	fclose(fp);
 	return ecode;
 }
+
+#ifdef __cplusplus
+}
+#endif 
+

@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif 
+
 extern uint16_t get16(void *buff);
 extern uint16_t put16(void *buff, uint16_t val);
 
@@ -11,6 +15,10 @@ extern uint32_t put32(void *buff, uint32_t val);
 
 extern void put64(void *buff, void *val);
 extern int cmp64(void *a, void *b);
+
+#ifdef __cplusplus
+}
+#endif 
 
 #endif
 
