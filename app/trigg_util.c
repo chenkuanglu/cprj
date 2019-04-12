@@ -77,22 +77,41 @@ char *bnum2hex(uint8_t *bnum)
 	return buff;
 }
 
-int readtrailer(btrailer_t *trailer, char *fname)
+// covert string(domain or IPv4 numbers-and-dots notation) to binary ip
+uint32_t str2ip(char *addrstr)
 {
-	FILE *fp;
+    if (addrstr == NULL) 
+        return 0;
 
-	fp = fopen(fname, "rb");
-	if (fp == NULL) return VERROR;
-	if (fseek(fp, -(sizeof(btrailer_t)), SEEK_END) != 0) {
-	bad:
-		fclose(fp);
-		return VERROR;
-	}
-	if (fread(trailer, 1, sizeof(btrailer_t), fp) != sizeof(btrailer_t)) goto bad;
-	fclose(fp);
-	return VEOK;
+    struct hostent *host;
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+
+    if (addrstr[0] < '0' || addrstr[0] > '9') {
+        if ((host = gethostbyname(addrstr)) == NULL)
+            return 0;
+        else
+            memcpy((char *)&(addr.sin_addr.s_addr), host->h_addr_list[0], host->h_length);
+    } else {
+        addr.sin_addr.s_addr = inet_addr(addrstr);
+    }
+    return addr.sin_addr.s_addr;
 }
 
+void trigg_coreip_shuffle(uint32_t *list, uint32_t len)
+{
+    uint32_t *ptr, *p2, temp, ix;
+
+    if (len < 2) 
+        return;
+    for (ptr = &list[len - 1]; len > 1; len--, ptr--) {
+        ix = rand16() % len;
+        p2 = &list[ix];
+        temp = *ptr;
+        *ptr = *p2;
+        *p2 = temp;
+    }
+}
 
 int patch_addr(char *cblock, char *addrfile)
 {

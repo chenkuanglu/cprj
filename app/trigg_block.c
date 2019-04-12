@@ -22,7 +22,7 @@ SOCKET connectip(uint32_t ip, double tout)
 	uint16_t port;
 	double timeout;
 	if ((sd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-		sloge(CLOG, "socket() open fail: %s", strerror(errno));
+		sloge(CLOG, "Socket() open fail: %s", strerror(errno));
 		return INVALID_SOCKET;
 	}
 	port = PORT;
@@ -31,7 +31,7 @@ SOCKET connectip(uint32_t ip, double tout)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 
-	slogd(CLOG, "Trying to connect %s:%d...  ", ntoa((uint8_t *)&ip), port);
+	slogd(CLOG, "Trying to connect %s:%d...\n", ntoa((uint8_t *)&ip), port);
 	nonblock(sd);
 	timeout = monotime() + tout;
 
@@ -42,10 +42,10 @@ retry:
         if ( (errno == EINPROGRESS || errno == EALREADY) && (monotime() < timeout) ) 
             goto retry;
 		close(sd);
-		sloge(CLOG, "connect() to coreip fail.");
+		slogw(CLOG, "Connect() to coreip fail\n");
 		return INVALID_SOCKET;
 	}
-	slogd(CLOG, "connect() to coreip ok.");
+	slogd(CLOG, "Connect() to coreip ok.\n");
 out:
 	nonblock(sd);
 	return sd;
@@ -73,7 +73,7 @@ int sendtx2(NODE *np)
     errno = 0;
     count = send(np->sd, (const char *)TXBUFF(tx), TXBUFFLEN, 0);
     if (count != TXBUFFLEN) {
-        sloge(CLOG, "sendtx2() fail: %s\n", strerror(errno));
+        sloge(CLOG, "Sendtx2() fail: %s\n", strerror(errno));
         return VERROR;
     }
     return VEOK;
@@ -165,22 +165,68 @@ bad:
     return VEOK;
 }
 
+
+int get_block3(NODE *np, trigg_cand_t *cand, double timeout)
+{
+    uint16_t len;
+    int ecode;
+
+    if (cand->cand_data != NULL) {
+        free(cand->cand_data);
+        cand->cand_data = NULL;
+        cand->cand_trailer = NULL;
+        cand->cand_len = 0;
+    }
+
+    for (;;) {
+        if ((ecode = rx2(np, 1, timeout)) != VEOK)      // receive candidate data
+            goto bad;
+        if (get16(np->tx.opcode) != OP_SEND_BL) 
+            goto bad;
+        len = get16(np->tx.len);
+        slogd(CLOG, "Receive a candidate section, size %d\n", len);
+        if (len > TRANLEN)
+            goto bad;
+        if (len) {
+            cand->cand_data = (char *)realloc(cand->cand_data, cand->cand_len+len);
+            memcpy(cand->cand_data+cand->cand_len, TRANBUFF(&np->tx), len);
+            cand->cand_len += len;
+        }
+        if ( (len < 1) || (len > 0 && len < TRANLEN) ) {
+            cand->cand_trailer = (btrailer_t *)(cand->cand_data + (cand->cand_len - sizeof(btrailer_t)));
+            cand->cand_tm = monotime();
+            slogd(CLOG, "Candidate receive done, total size %d\n", cand->cand_len);
+            slogd(CLOG, "Get trailer bnum: 0x%s\n", bnum2hex(cand->cand_trailer->bnum));
+            for (int i=0; i<9; i++) {
+                slogd(CLOG, "Get trailer phash: 0x%08x\n", ((int*)cand->cand_trailer->phash)[i]);
+            }
+            return 0;
+        }
+    }
+bad:
+    slogw(CLOG, "Get_block3() fail(%d): %s\n", ecode, strerror(errno));
+    return -1;
+}
+
 // if block num invalid, func retry internally
 int trigg_get_cblock(trigg_cand_t *cand, int retry)
 {
     NODE node;
-    slogd(CLOG, "start getting new candidate...\n");
+    const double timeout = 10.0;     // 3s timeout
+    slogd(CLOG, "\n");
+    slogd(CLOG, "Start getting new candidate...\n");
 
 retry:
-    if (callserver(&node, cand, 3) != VEOK)     // 3s timeout
+    if (callserver(&node, cand, timeout) != VEOK)
         return VERROR;
 
-    if (cmp64(cand->server_bnum, last_bnum) < 0) {
+    slogd(CLOG, "Get server bnum: 0x%s\n", bnum2hex(cand->server_bnum));
+    if (cmp64(cand->server_bnum, last_bnum) < 0) {      // cur_sbnum < last_sbnum ?
         slogw(CLOG, "This server doesn't have the latest block. switch a different server.\n");
         close(node.sd);
         (cand->coreip_ix)++;    // switch to next coreip
         if (--retry > 0) {
-            slogw(CLOG, "Block num invalid, retry...\n");
+            slogw(CLOG, "Server bnum invalid, retry...\n");
             goto retry;
         } else {
             return VERROR;
@@ -189,9 +235,9 @@ retry:
     }
 
     put16(node.tx.len, 1);
-    slogw(CLOG, "Attempting to download candidate block from network...\n");
+    slogd(CLOG, "Attempting to download candidate block from network...\n");
     send_op(&node, OP_GET_CBLOCK);
-    if (get_block3(&node, cand) != 0) {
+    if (get_block3(&node, cand, timeout) != 0) {    // 'cand->cand_data' may be destroyed
         close(node.sd);
         (cand->coreip_ix)++;    // switch to next coreip
         if (--retry > 0) {
@@ -203,8 +249,15 @@ retry:
     }
     close(node.sd);
 
-    // date trailer len
-    cand->cand_tm = monotime();
+    if (cmp64(cand->server_bnum, cand->cand_trailer->bnum) >= 0) {  // sbnum >= tbnum ?
+        if (--retry > 0) {
+            slogw(CLOG, "Trailer bnum invalid, retry...\n");
+            goto retry;
+        } else {
+            return VERROR;
+        }
+    }
+
     return VEOK;
 }
 

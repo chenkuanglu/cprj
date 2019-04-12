@@ -105,21 +105,6 @@ int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src)
     return 0;
 }
 
-void trigg_coreip_shuffle(uint32_t *list, uint32_t len)
-{
-    uint32_t *ptr, *p2, temp, ix;
-
-    if (len < 2) 
-        return;
-    for (ptr = &list[len - 1]; len > 1; len--, ptr--) {
-        ix = rand16() % len;
-        p2 = &list[ix];
-        temp = *ptr;
-        *ptr = *p2;
-        *p2 = temp;
-    }
-}
-
 void* thread_trigg_pool(void *arg)
 {
     (void)arg;
@@ -143,7 +128,7 @@ void* thread_trigg_pool(void *arg)
 
         switch (cmd) {
             case 0:     // thrq receive timeout
-                slogd(triggm.log, "Thread pool %.3fs timeout\n", que_tout);
+                //slogd(triggm.log, "Thread pool %.3fs timeout\n", que_tout);
                 break;
             case 1:     // start/top miner ?
                 break;
@@ -173,39 +158,17 @@ void* thread_trigg_pool(void *arg)
         // get new job from pool every 10s
         if (tm_cand == 0 || monotime() - tm_cand > 10) {
             int retry = triggm.retry_num;
-            while (trigg_get_cblock(&cand, CORELISTLEN) != 0) {
+            while (trigg_get_cblock(&cand, CORELISTLEN) != 0) {     // 'cand->cand_data' may be destroyed
                 if (--retry <= 0)
                     process_proper_exit(errno);
             }
             tm_cand = monotime();
 
-            // compare blk num ???
             mux_lock(&triggm.cand_lock);
             trigg_cand_copy(&triggm.candidate, &cand);
             mux_unlock(&triggm.cand_lock);
         }
     }
-}
-
-// covert string(domain or IPv4 numbers-and-dots notation) to binary ip
-uint32_t str2ip(char *addrstr)
-{
-    if (addrstr == NULL) 
-        return 0;
-
-    struct hostent *host;
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-
-    if (addrstr[0] < '0' || addrstr[0] > '9') {
-        if ((host = gethostbyname(addrstr)) == NULL)
-            return 0;
-        else
-            memcpy((char *)&(addr.sin_addr.s_addr), host->h_addr_list[0], host->h_length);
-    } else {
-        addr.sin_addr.s_addr = inet_addr(addrstr);
-    }
-    return addr.sin_addr.s_addr;
 }
 
 // convert nodes lst to core ip lst

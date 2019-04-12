@@ -28,9 +28,12 @@ extern void put32(void *buff, uint32_t val);
 
 extern void put64(void *buff, void *val);
 extern int cmp64(void *a, void *b);
+extern char *bnum2hex(uint8_t *bnum);
 
 extern int nonblock(SOCKET sd);
 extern char *ntoa(uint8_t *a);
+extern uint32_t str2ip(char *addrstr);
+extern void trigg_coreip_shuffle(uint32_t *list, uint32_t len);
 
 #ifdef __cplusplus
 }
