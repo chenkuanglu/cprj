@@ -12,6 +12,7 @@
 #include <netdb.h>
 
 #include "trigg_miner.h"
+#include "trigg_util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +26,7 @@ void* thread_trigg_pool(void *arg);
 int trigg_init(start_info_t *sinfo)
 {
     memset(&triggm, 0, sizeof(trigg_miner_t));
-    triggm.log = core_getlog();
+    triggm.log = CLOG;
 
     triggm.nodes_lst.url = sinfo->argv[1];
     triggm.nodes_lst.filename = strdup("startnodes.lst");
@@ -82,7 +83,7 @@ int trigg_coreipl_copy(uint32_t *dst, uint32_t *src)
 {
     if (dst == NULL || src == NULL)
         return -1;
-    for (int i=0; i<TRIGG_CORELIST_LEN; i++) {
+    for (int i=0; i<CORELISTLEN; i++) {
         dst[i] = src[i];
     }
     return 0;
@@ -162,8 +163,8 @@ void* thread_trigg_pool(void *arg)
             cand.coreip_ix = 0;
             memset(cand.coreip_lst, 0, sizeof(cand.coreip_lst));
             trigg_nodesl_to_coreipl(triggm.nodes_lst.filedata, cand.coreip_lst);
-            trigg_coreip_shuffle(cand.coreip_lst, TRIGG_CORELIST_LEN);
-            for (int i=0; i<TRIGG_CORELIST_LEN; i++) {
+            trigg_coreip_shuffle(cand.coreip_lst, CORELISTLEN);
+            for (int i=0; i<CORELISTLEN; i++) {
                 if (cand.coreip_lst[i] != 0)
                     slogd(triggm.log, "Shuffled IPs[%02d] 0x%08x\n", i, cand.coreip_lst[i]);
             }
@@ -172,7 +173,7 @@ void* thread_trigg_pool(void *arg)
         // get new job from pool every 10s
         if (tm_cand == 0 || monotime() - tm_cand > 10) {
             int retry = triggm.retry_num;
-            while (trigg_get_cblock(&cand) != 0) {
+            while (trigg_get_cblock(&cand, CORELISTLEN) != 0) {
                 if (--retry <= 0)
                     process_proper_exit(errno);
             }
@@ -221,7 +222,7 @@ int trigg_nodesl_to_coreipl(char *nodesl, uint32_t *coreipl)
     if (str == NULL)
         return -1;
     char *sep = str;
-    for (j=0; j<TRIGG_CORELIST_LEN; ) {
+    for (j=0; j<CORELISTLEN; ) {
         if ((line = strsep(&sep, "\n")) == NULL) {
             break;
         }

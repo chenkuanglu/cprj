@@ -39,7 +39,7 @@ static void print_args(int argc, char **argv)
 // application init
 void app_init(start_info_t *sinfo)
 {
-    init_log = core_getlog();
+    init_log = CLOG;
     slogd(init_log, "app init...\n");
 
 #ifdef PRINT_ARGS

@@ -21,6 +21,8 @@ extern "C" {
 #define SOCKET                  unsigned int   /* Borland 32-bit */
 #define INVALID_SOCKET          (SOCKET)(~0)
 
+#define PVERSION    2
+
 #define VEOK        0      /* No error                    */
 #define VERROR      1      /* General error               */
 #define VEBAD       2      /* client was bad              */
@@ -109,9 +111,10 @@ typedef struct {
     uint32_t    coreip_lst[CORELISTLEN];
     int         coreip_ix;
 
+    char        server_bnum[8];     // callserver()
+
     char        *cand_data;
     btrailer_t  *cand_trailer;
-    char        cand_bnum[8];
     int         cand_len;
     double      cand_tm;
 } trigg_cand_t;
@@ -125,7 +128,7 @@ typedef struct {
 } nodes_lst_t;
 /* --------------------- user definition end --------------------- */
 
-extern int trigg_get_cblock(trigg_cand_t *cand);
+extern int trigg_get_cblock(trigg_cand_t *cand, int retry);
 extern int callserver(NODE *np, trigg_cand_t *cand, double timeout);
 extern int rx2(NODE *np, int checkids, double sec);
 extern SOCKET connectip(uint32_t ip, double tout);

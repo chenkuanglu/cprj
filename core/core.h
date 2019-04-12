@@ -43,10 +43,12 @@ typedef void* (*core_thread_t)(void *);
                                     for (;;) nsleep(60);\
                                 } while (0)
 
-extern int          core_init(void);
-extern log_cb_t*    core_getlog(void);
-extern void         core_proper_exit(int ec);
+extern log_cb_t *core_log;
 
+#define CLOG        core_log 
+
+extern int          core_init(void);
+extern void         core_proper_exit(int ec);
 extern void         process_proper_exit(int ec);
 
 #ifdef __cplusplus

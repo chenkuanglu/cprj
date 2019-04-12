@@ -8,7 +8,7 @@
  *
 */
 
-#include "trigg_miner.h"
+#include "trigg_util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,25 +53,18 @@ int cmp64(void *a, void *b)
 	return 0;
 }
 
-void shuffle32(uint32_t *list, uint32_t len)
-{
-	uint32_t *ptr, *p2, temp;
-
-	if (len < 2) return;
-	for (ptr = &list[len - 1]; len > 1; len--, ptr--) {
-		p2 = &list[rand16() % len];
-		temp = *ptr;
-		*ptr = *p2;
-		*p2 = temp;
-	}
-}
-
 char *ntoa(uint8_t *a)
 {
 	static char s[24];
 
 	sprintf(s, "%d.%d.%d.%d", a[0], a[1], a[2], a[3]);
 	return s;
+}
+
+int nonblock(SOCKET sd)
+{
+    unsigned long arg = 1L;
+    return ioctl(sd, FIONBIO, (unsigned long FAR *) &arg);
 }
 
 char *bnum2hex(uint8_t *bnum)

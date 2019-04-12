@@ -16,6 +16,7 @@ typedef struct {
 } core_info_t;
 
 static core_info_t core_info;
+log_cb_t *core_log;
 
 log_cb_t* core_getlog(void)
 {
@@ -30,6 +31,7 @@ int core_init(void)
         return -1;
     if (log_init(&core_info.log) != 0) 
         return -1;
+    core_log = &core_info.log;
     return 0;
 }
 

@@ -1,9 +1,6 @@
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-
+// 
+// trigg_block.c
+//
 #include "trigg_block.h"
 #include "trigg_util.h"
 #include "trigg_rand.h"
@@ -13,14 +10,10 @@
 extern "C" {
 #endif 
 
-#define FAR
 static uint32_t PORT = 2095;
+static uint32_t PORT2 = 2096;
 
-int nonblock(SOCKET sd)                                                                                                           
-{
-    unsigned long arg = 1L;
-    return ioctl(sd, FIONBIO, (unsigned long FAR *) &arg);
-}
+static char last_bnum[8] = {0};
 
 SOCKET connectip(uint32_t ip, double tout)
 {
@@ -29,7 +22,7 @@ SOCKET connectip(uint32_t ip, double tout)
 	uint16_t port;
 	double timeout;
 	if ((sd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-		//loge("socket() open fail: %s", strerror(errno));
+		sloge(CLOG, "socket() open fail: %s", strerror(errno));
 		return INVALID_SOCKET;
 	}
 	port = PORT;
@@ -38,7 +31,7 @@ SOCKET connectip(uint32_t ip, double tout)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 
-	slogd("Trying to connect %s:%d...  ", ntoa((uint8_t *)&ip), port);
+	slogd(CLOG, "Trying to connect %s:%d...  ", ntoa((uint8_t *)&ip), port);
 	nonblock(sd);
 	timeout = monotime() + tout;
 
@@ -49,13 +42,41 @@ retry:
         if ( (errno == EINPROGRESS || errno == EALREADY) && (monotime() < timeout) ) 
             goto retry;
 		close(sd);
-		slogd(triggm.log, "connect() to coreip fail.");
+		sloge(CLOG, "connect() to coreip fail.");
 		return INVALID_SOCKET;
 	}
-	slogd(triggm.log, "connect() to coreip ok.");
+	slogd(CLOG, "connect() to coreip ok.");
 out:
 	nonblock(sd);
 	return sd;
+}
+
+void crctx(TX *tx)
+{
+    put16(CRC_VAL_PTR(tx), crc16(CRC_BUFF(tx), CRC_COUNT));
+}
+
+// send operation
+int sendtx2(NODE *np)
+{
+    int count;
+    TX *tx;
+
+    tx = &np->tx;
+
+    put16(tx->version, PVERSION);
+    put16(tx->network, TXNETWORK);
+    put16(tx->trailer, TXEOT);
+    put16(tx->id1, np->id1);
+    put16(tx->id2, np->id2);
+    crctx(tx);
+    errno = 0;
+    count = send(np->sd, (const char *)TXBUFF(tx), TXBUFFLEN, 0);
+    if (count != TXBUFFLEN) {
+        sloge(CLOG, "sendtx2() fail: %s\n", strerror(errno));
+        return VERROR;
+    }
+    return VEOK;
 }
 
 int send_op(NODE *np, int opcode)
@@ -64,6 +85,7 @@ int send_op(NODE *np, int opcode)
     return sendtx2(np);
 }
 
+// receive data after 'connect' & 'send_op'
 int rx2(NODE *np, int checkids, double sec)
 {
 	int count, n;
@@ -98,7 +120,8 @@ int rx2(NODE *np, int checkids, double sec)
 	return VEOK;
 }
 
-// connect & get NODE(send hello)
+// connect ip & get NODE(send hello)
+// callserver() before send 'operation'
 int callserver(NODE *np, trigg_cand_t *cand, double timeout)
 {
     if (np == NULL || cand == NULL)
@@ -125,7 +148,7 @@ int callserver(NODE *np, trigg_cand_t *cand, double timeout)
     send_op(np, OP_HELLO);
     int ecode = rx2(np, 0, timeout);
     if(ecode != VEOK) {
-        //loge("Missing HELLO_ACK packet (%d)", ecode);
+        sloge(CLOG, "Missing HELLO_ACK packet (%d)", ecode);
 bad:
         close(np->sd);
         np->sd = INVALID_SOCKET;
@@ -135,21 +158,55 @@ bad:
     np->id2 = get16(np->tx.id2);
     np->opcode = get16(np->tx.opcode);
     if(np->opcode != OP_HELLO_ACK) {
-        //loge("HELLO_ACK is wrong: %d", np->opcode);
+        sloge(CLOG, "HELLO_ACK is wrong: %d", np->opcode);
         goto bad;
     }
-    put64(cand->cand_bnum, np->tx.cblock);  // copy blocknum
+    put64(cand->server_bnum, np->tx.cblock);  // copy blocknum
     return VEOK;
 }
 
-int trigg_get_cblock(trigg_cand_t *cand)
+// if block num invalid, func retry internally
+int trigg_get_cblock(trigg_cand_t *cand, int retry)
 {
-    slogd(triggm.log, "get new candidate...\n");
+    NODE node;
+    slogd(CLOG, "start getting new candidate...\n");
+
+retry:
+    if (callserver(&node, cand, 3) != VEOK)     // 3s timeout
+        return VERROR;
+
+    if (cmp64(cand->server_bnum, last_bnum) < 0) {
+        slogw(CLOG, "This server doesn't have the latest block. switch a different server.\n");
+        close(node.sd);
+        (cand->coreip_ix)++;    // switch to next coreip
+        if (--retry > 0) {
+            slogw(CLOG, "Block num invalid, retry...\n");
+            goto retry;
+        } else {
+            return VERROR;
+        }
+        memcpy(last_bnum, cand->server_bnum, 8);
+    }
+
+    put16(node.tx.len, 1);
+    slogw(CLOG, "Attempting to download candidate block from network...\n");
+    send_op(&node, OP_GET_CBLOCK);
+    if (get_block3(&node, cand) != 0) {
+        close(node.sd);
+        (cand->coreip_ix)++;    // switch to next coreip
+        if (--retry > 0) {
+            slogw(CLOG, "Get candidate fail, retry...\n");
+            goto retry;
+        } else {
+            return VERROR;
+        }
+    }
+    close(node.sd);
+
     // date trailer len
     cand->cand_tm = monotime();
-    return 0;
+    return VEOK;
 }
-
 
 #ifdef __cplusplus
 }

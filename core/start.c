@@ -48,7 +48,7 @@ int main(int argc, char **argv)
         loge("core_init() fail: %d\n", errno);    // 'clog' & 'err_string()' unavailable before 'core_init()'!
         return 0;
     }
-    clog = core_getlog();
+    clog = CLOG;
 
     // all sub threads mask signal SIGINT(2) & SIGTERM(15) 
     sigemptyset(&mask_set);
