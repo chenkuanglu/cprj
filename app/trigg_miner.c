@@ -234,7 +234,7 @@ void trigg_solve(btrailer_t *bt, int diff, uint8_t *bnum)
     put16(triggm.chain + (32 + 258), rand16());
 #ifdef DEBUG
     int *p = (int*)bt->nonce;
-    slogd(CLOG, "tchain nonce low: 0x%08x\n", p[0]);
+    slogd(CLOG, "tailer nonce low: 0x%08x\n", p[0]);
     p = (int*)&(triggm.chain[32 + 256]);
     slogd(CLOG, "tchain nonce high: 0x%08x\n", p[0]);
 #endif

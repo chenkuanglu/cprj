@@ -99,11 +99,16 @@ char *trigg_generate(byte *chain, byte *nonce, int diff)
 {
     byte h[32];
 
+    static int first = 0;
+    if (first == 0 )
+        slogw(CLOG, "nonceH = 0x%08x\n", *((int*)&chain[32 + 256]));
     trigg_gen(&chain[32 + 256]);
+    if (first == 0 )
+        slogw(CLOG, "gen: nonceH = 0x%08x\n", *((int*)&chain[32 + 256]));
     sha256(chain, (32 + 256 + 16 + 8), h);
 
 #ifdef DEBUG
-    static int first = 0;
+    //static int first = 0;
     char *res;
     if (first++ == 0) {
         slogd(CLOG, "first hash:\n");
