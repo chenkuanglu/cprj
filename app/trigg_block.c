@@ -135,7 +135,8 @@ int callserver(NODE *np, trigg_cand_t *cand, double timeout)
         pthread_testcancel();
         if (cand->coreip_ix >= CORELISTLEN) 
             cand->coreip_ix = 0;
-        if ((ip = cand->coreip_lst[cand->coreip_ix]) == 0)
+        ip = cand->coreip_lst[cand->coreip_ix];
+        if (ip == 0 || ip == (uint32_t)0x0100007f)    // 0 & 127.0.0.1
             continue;
         if ((np->sd = connectip(ip, timeout)) != INVALID_SOCKET)
             break;      // connect ip ok
@@ -196,9 +197,22 @@ int get_block3(NODE *np, trigg_cand_t *cand, double timeout)
             cand->cand_trailer = (btrailer_t *)(cand->cand_data + (cand->cand_len - sizeof(btrailer_t)));
             cand->cand_tm = monotime();
             slogd(CLOG, "Candidate receive done, total size %d\n", cand->cand_len);
-            slogd(CLOG, "Get trailer bnum: 0x%s\n", bnum2hex(cand->cand_trailer->bnum));
-            for (int i=0; i<9; i++) {
-                slogd(CLOG, "Get trailer phash: 0x%08x\n", ((int*)cand->cand_trailer->phash)[i]);
+
+#ifdef DEBUG
+            FILE *fp;
+            if ((fp = fopen("./candidate.tmp", "w+b")) != NULL) {
+                fwrite(cand->cand_data, 1, cand->cand_len, fp);
+                fclose(fp);
+            }
+#endif
+            // print tailer info
+            slogd(CLOG, "Trailer block num: 0x%s\n", bnum2hex(cand->cand_trailer->bnum));
+            slogd(CLOG, "Trailer difficulty: %d\n", cand->cand_trailer->difficulty[0]);
+            for (int i=0; i<8; i++) {
+                slogd(CLOG, "Get trailer phash[%02d]: 0x%08x\n", i, ((int*)cand->cand_trailer->phash)[i]);
+            }
+            for (int i=0; i<8; i++) {
+                slogd(CLOG, "Get trailer mroot[%02d]: 0x%08x\n", i, ((int*)cand->cand_trailer->mroot)[i]);
             }
             return 0;
         }

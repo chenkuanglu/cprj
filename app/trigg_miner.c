@@ -93,12 +93,13 @@ int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src)
 {
     if (trigg_coreipl_copy(dst->coreip_lst, src->coreip_lst) != 0)
         return -1;
-    dst->coreip_ix = src->coreip_ix;
     if (dst->cand_data)
         free(dst->cand_data);
     if ((dst->cand_data = (char *)malloc(src->cand_len)) == NULL) 
         return -1;
     memcpy(dst->cand_data, src->cand_data, dst->cand_len);
+    memcpy(dst->server_bnum, src->server_bnum, 8);
+    dst->coreip_ix = src->coreip_ix;
     dst->cand_trailer = src->cand_trailer;
     dst->cand_len = src->cand_len;
     dst->cand_tm = src->cand_tm;
@@ -107,6 +108,8 @@ int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src)
 
 void* thread_trigg_pool(void *arg)
 {
+#define TRAILER_DEBUG
+
     (void)arg;
     char ebuf[128];
     double que_tout = 1.0;
@@ -167,6 +170,33 @@ void* thread_trigg_pool(void *arg)
             mux_lock(&triggm.cand_lock);
             trigg_cand_copy(&triggm.candidate, &cand);
             mux_unlock(&triggm.cand_lock);
+
+#ifdef TRAILER_DEBUG
+            static btrailer_t bt;
+            FILE *fp = fopen("./candidate", "rb");
+            if (fp == NULL) {
+                sloge(CLOG, "Open file ./candidate fail\n");
+            } else {
+                fseek(fp, -(sizeof(btrailer_t)), SEEK_END);
+                fread(&bt, 1, sizeof(btrailer_t), fp);
+            }
+            fclose(fp);
+
+            mux_lock(&triggm.cand_lock);
+            memcpy(triggm.candidate.cand_trailer, &bt, sizeof(btrailer_t));
+            mux_unlock(&triggm.cand_lock);
+#endif
+
+            // print tailer info
+            slogd(CLOG, "Fixed trailer debug:\n");
+            slogd(CLOG, "Trailer block num: 0x%s\n", bnum2hex(triggm.candidate.cand_trailer->bnum));
+            slogd(CLOG, "Trailer difficulty: %d\n", triggm.candidate.cand_trailer->difficulty[0]);
+            for (int i=0; i<8; i++) {
+                slogd(CLOG, "Get trailer phash[%02d]: 0x%08x\n", i, ((int*)triggm.candidate.cand_trailer->phash)[i]);
+            }
+            for (int i=0; i<8; i++) {
+                slogd(CLOG, "Get trailer mroot[%02d]: 0x%08x\n", i, ((int*)triggm.candidate.cand_trailer->mroot)[i]);
+            }
         }
     }
 }
