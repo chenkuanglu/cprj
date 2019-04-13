@@ -13,6 +13,7 @@
 
 #include "trigg_miner.h"
 #include "trigg_util.h"
+#include "trigg_crypto.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,6 +23,9 @@ trigg_miner_t triggm;
 
 void* thread_trigg_miner(void *arg);
 void* thread_trigg_pool(void *arg);
+int trigg_coreipl_copy(uint32_t *dst, uint32_t *src);
+int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src);
+void trigg_solve(btrailer_t *bt, int diff, uint8_t *bnum);
 
 int trigg_init(start_info_t *sinfo)
 {
@@ -60,15 +64,17 @@ int trigg_init(start_info_t *sinfo)
 
 void* thread_trigg_miner(void *arg)
 {
+#define TRIGG_CPU_MINER
+
     (void)arg;
     char ebuf[128];
 
-    //cur_iptbl[];
-    //if new, update tbl
+    trigg_cand_t cand_mining;
+    memset(&cand_mining, 0, sizeof(trigg_cand_t));
 
     int cmd;
     for (;;) {
-        cmd = 0;
+        cmd = TRIGG_CMD_NOTHING;
         if (thrq_receive(&triggm.thrq_miner, &cmd, sizeof(cmd), 1.0) < 0) {  // 1s timeout
             if (errno != ETIMEDOUT) {
                 sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
@@ -76,7 +82,162 @@ void* thread_trigg_miner(void *arg)
                 continue;
             }
         }
+
+        switch (cmd) {
+            case TRIGG_CMD_NOTHING:
+                break;
+            case TRIGG_CMD_NEW_JOB:
+                mux_lock(&triggm.cand_lock);
+                if (cand_mining.cand_tm < triggm.candidate.cand_tm) {
+                    trigg_cand_copy(&cand_mining, &triggm.candidate);
+                    slogd(triggm.log, "New job received\n");
+                }
+                mux_unlock(&triggm.cand_lock);
+                // need clean chips?
+                break;
+            default:
+                break;
+        }
+
+#ifdef TRIGG_CPU_MINER
+        if (cand_mining.cand_trailer) {
+            long long tgt = trigg_diff_val(cand_mining.cand_trailer->difficulty[0]);
+            slogd(CLOG, "diff = %d, target = 0x%016llx\n", cand_mining.cand_trailer->difficulty[0], tgt);
+
+            // ***************** set for debug *****************
+            cand_mining.cand_trailer->bnum[0] = 0x8c;
+            cand_mining.cand_trailer->bnum[1] = 0xca;
+            cand_mining.cand_trailer->difficulty[0] = 15;
+            // ***************** end *****************
+            
+            trigg_solve(cand_mining.cand_trailer, cand_mining.cand_trailer->difficulty[0], cand_mining.cand_trailer->bnum);
+            trigg_gen(cand_mining.cand_trailer->nonce);
+            trigg_expand((uint8_t *)triggm.chain, cand_mining.cand_trailer->nonce);
+
+            for (;;) {
+                pthread_testcancel();
+                if (trigg_generate((uint8_t *)triggm.chain, cand_mining.cand_trailer->nonce, cand_mining.cand_trailer->difficulty[0]) != NULL)
+                    break;
+            }
+        } else {
+            continue;
+        }
+#endif
     }
+}
+
+void* thread_trigg_pool(void *arg)
+{
+#define TRAILER_DEBUG
+
+    (void)arg;
+    char ebuf[128];
+    double que_tout = 1.0;
+    double tm_nlst = 0;
+    double tm_cand = 0;
+    trigg_cand_t cand;
+    memset(&cand, 0, sizeof(cand));
+    
+    int cmd;
+    for (;;) {
+        cmd = TRIGG_CMD_NOTHING;
+        if (thrq_receive(&triggm.thrq_pool, &cmd, sizeof(cmd), que_tout) < 0) {  // 1s timeout
+            if (errno != ETIMEDOUT) {
+                sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
+                nsleep(0.1);
+                continue;
+            }
+        }
+
+        switch (cmd) {
+            case TRIGG_CMD_NOTHING:
+                break;
+            default:
+                break;
+        }
+
+        // update nodes list every 1h
+        if (tm_nlst == 0 || monotime() - tm_nlst > 3600) {
+            int retry = triggm.retry_num;
+            while (trigg_download_lst() != 0) {
+                if (--retry <= 0)
+                    process_proper_exit(errno);
+            }
+            tm_nlst = monotime();
+
+            cand.coreip_ix = 0;
+            memset(cand.coreip_lst, 0, sizeof(cand.coreip_lst));
+            trigg_nodesl_to_coreipl(triggm.nodes_lst.filedata, cand.coreip_lst);
+            trigg_coreip_shuffle(cand.coreip_lst, CORELISTLEN);
+            for (int i=0; i<CORELISTLEN; i++) {
+                if (cand.coreip_lst[i] != 0)
+                    slogd(triggm.log, "Shuffled IPs[%02d] 0x%08x\n", i, cand.coreip_lst[i]);
+            }
+        }
+
+        // get new job from pool every 600s
+        if (tm_cand == 0 || monotime() - tm_cand > 600) {
+            int retry = triggm.retry_num;
+            while (trigg_get_cblock(&cand, CORELISTLEN) != 0) {     // 'cand->cand_data' may be destroyed
+                if (--retry <= 0)
+                    process_proper_exit(errno);
+            }
+            tm_cand = monotime();
+
+            mux_lock(&triggm.cand_lock);
+            trigg_cand_copy(&triggm.candidate, &cand);
+            mux_unlock(&triggm.cand_lock);
+
+#ifdef TRAILER_DEBUG
+            static btrailer_t bt;
+            FILE *fp = fopen("./candidate", "rb");
+            if (fp == NULL) {
+                sloge(CLOG, "Open file ./candidate fail\n");
+            } else {
+                fseek(fp, -(sizeof(btrailer_t)), SEEK_END);
+                fread(&bt, 1, sizeof(btrailer_t), fp);
+            }
+            fclose(fp);
+
+            mux_lock(&triggm.cand_lock);
+            memcpy(triggm.candidate.cand_trailer, &bt, sizeof(btrailer_t));
+            triggm.candidate.cand_trailer->difficulty[0] = 15;  // set diff
+            mux_unlock(&triggm.cand_lock);
+
+            // print tailer info
+            slogd(CLOG, "Fixed trailer debug:\n");
+            slogd(CLOG, "Trailer block num: 0x%s\n", bnum2hex(triggm.candidate.cand_trailer->bnum));
+            slogd(CLOG, "Trailer difficulty: %d\n", triggm.candidate.cand_trailer->difficulty[0]);
+            for (int i=0; i<8; i++) {
+                slogd(CLOG, "Get trailer phash[%02d]: 0x%08x\n", i, ((int*)triggm.candidate.cand_trailer->phash)[i]);
+            }
+            for (int i=0; i<8; i++) {
+                slogd(CLOG, "Get trailer mroot[%02d]: 0x%08x\n", i, ((int*)triggm.candidate.cand_trailer->mroot)[i]);
+            }
+#endif
+
+            cmd = TRIGG_CMD_NEW_JOB;
+            thrq_send(&triggm.thrq_miner, &cmd, sizeof(cmd));
+        }
+    }
+}
+
+void trigg_solve(btrailer_t *bt, int diff, uint8_t *bnum)
+{
+    triggm.diff = diff;
+    memset(triggm.chain + 32, 0, (256 + 16));
+    memcpy(triggm.chain, bt->mroot, 32);
+    memcpy(triggm.chain + 32 + 256 + 16, bnum, 8);
+    put16(bt->nonce + 0, rand16());                 // tainler's nonceL[16] (low nonce) as xnonce
+    put16(bt->nonce + 2, rand16());
+    put16(triggm.chain + (32 + 256), rand16());     // tchain's nonceH[16] (high nonce) for hardware calc
+    put16(triggm.chain + (32 + 258), rand16());
+#ifdef DEBUG
+    int *p = (int*)bt->nonce;
+    slogd(CLOG, "tchain nonce low: 0x%08x\n", p[0]);
+    p = (int*)&(triggm.chain[32 + 256]);
+    slogd(CLOG, "tchain nonce high: 0x%08x\n", p[0]);
+#endif
 }
 
 int trigg_coreipl_copy(uint32_t *dst, uint32_t *src)
@@ -104,101 +265,6 @@ int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src)
     dst->cand_len = src->cand_len;
     dst->cand_tm = src->cand_tm;
     return 0;
-}
-
-void* thread_trigg_pool(void *arg)
-{
-#define TRAILER_DEBUG
-
-    (void)arg;
-    char ebuf[128];
-    double que_tout = 1.0;
-    double tm_nlst = 0;
-    double tm_cand = 0;
-    trigg_cand_t cand;
-    memset(&cand, 0, sizeof(cand));
-    
-    int cmd;
-    for (;;) {
-        cmd = 0;
-        if (thrq_receive(&triggm.thrq_pool, &cmd, sizeof(cmd), que_tout) < 0) {  // 1s timeout
-            if (errno != ETIMEDOUT) {
-                sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
-                nsleep(0.1);
-                continue;
-            }
-        }
-
-        switch (cmd) {
-            case 0:     // thrq receive timeout
-                //slogd(triggm.log, "Thread pool %.3fs timeout\n", que_tout);
-                break;
-            case 1:     // start/top miner ?
-                break;
-            default:    // miner submit some nonce, try download new candidate?
-                break;
-        }
-
-        // update nodes list every 1h
-        if (tm_nlst == 0 || monotime() - tm_nlst > 3600) {
-            int retry = triggm.retry_num;
-            while (trigg_download_lst() != 0) {
-                if (--retry <= 0)
-                    process_proper_exit(errno);
-            }
-            tm_nlst = monotime();
-
-            cand.coreip_ix = 0;
-            memset(cand.coreip_lst, 0, sizeof(cand.coreip_lst));
-            trigg_nodesl_to_coreipl(triggm.nodes_lst.filedata, cand.coreip_lst);
-            trigg_coreip_shuffle(cand.coreip_lst, CORELISTLEN);
-            for (int i=0; i<CORELISTLEN; i++) {
-                if (cand.coreip_lst[i] != 0)
-                    slogd(triggm.log, "Shuffled IPs[%02d] 0x%08x\n", i, cand.coreip_lst[i]);
-            }
-        }
-
-        // get new job from pool every 10s
-        if (tm_cand == 0 || monotime() - tm_cand > 10) {
-            int retry = triggm.retry_num;
-            while (trigg_get_cblock(&cand, CORELISTLEN) != 0) {     // 'cand->cand_data' may be destroyed
-                if (--retry <= 0)
-                    process_proper_exit(errno);
-            }
-            tm_cand = monotime();
-
-            mux_lock(&triggm.cand_lock);
-            trigg_cand_copy(&triggm.candidate, &cand);
-            mux_unlock(&triggm.cand_lock);
-
-#ifdef TRAILER_DEBUG
-            static btrailer_t bt;
-            FILE *fp = fopen("./candidate", "rb");
-            if (fp == NULL) {
-                sloge(CLOG, "Open file ./candidate fail\n");
-            } else {
-                fseek(fp, -(sizeof(btrailer_t)), SEEK_END);
-                fread(&bt, 1, sizeof(btrailer_t), fp);
-            }
-            fclose(fp);
-
-            mux_lock(&triggm.cand_lock);
-            memcpy(triggm.candidate.cand_trailer, &bt, sizeof(btrailer_t));
-            mux_unlock(&triggm.cand_lock);
-#endif
-
-            // print tailer info
-            slogd(CLOG, "Fixed trailer debug:\n");
-            slogd(CLOG, "Trailer block num: 0x%s\n", bnum2hex(triggm.candidate.cand_trailer->bnum));
-            slogd(CLOG, "Trailer difficulty: %d\n", triggm.candidate.cand_trailer->difficulty[0]);
-            for (int i=0; i<8; i++) {
-                slogd(CLOG, "Get trailer phash[%02d]: 0x%08x\n", i, ((int*)triggm.candidate.cand_trailer->phash)[i]);
-            }
-            for (int i=0; i<8; i++) {
-                slogd(CLOG, "Get trailer mroot[%02d]: 0x%08x\n", i, ((int*)triggm.candidate.cand_trailer->mroot)[i]);
-            }
-        }
-    }
 }
 
 // convert nodes lst to core ip lst

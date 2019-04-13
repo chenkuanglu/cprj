@@ -10,6 +10,7 @@
 extern "C" {
 #endif 
 
+extern void randinit(void);
 extern uint32_t srand16(uint32_t x);
 extern uint32_t getrand16(void);
 extern void srand2(uint32_t x, uint32_t y, uint32_t z);

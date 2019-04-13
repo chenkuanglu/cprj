@@ -126,6 +126,9 @@ typedef struct {
     char    *filedata;
     int     len;
 } nodes_lst_t;
+
+typedef char tchain_t[32 + 256 + 16 + 8];
+
 /* --------------------- user definition end --------------------- */
 
 extern int trigg_get_cblock(trigg_cand_t *cand, int retry);

@@ -14,6 +14,12 @@
 extern "C" {
 #endif
 
+#define TRIGG_CMD_NOTHING       0x00000000
+#define TRIGG_CMD_NEW_JOB       0x00000001
+
+#define TRIGG_CMD_START         0x00000002
+#define TRIGG_CMD_STOP          0x00000003
+
 typedef struct {
     log_cb_t        *log;
 
@@ -21,6 +27,9 @@ typedef struct {
 
     trigg_cand_t    candidate;
     mux_t           cand_lock;
+
+    tchain_t        chain;
+    int             diff;
 
     pthread_t       thr_miner;
     thrq_cb_t       thrq_miner;

@@ -19,6 +19,14 @@ static uint32_t Lseed2 = 1;
 static uint32_t Lseed3 = 362436069;
 static uint32_t Lseed4 = 123456789;
 
+void randinit(void)
+{
+    Lseed = 1;
+    Lseed2 = 1;
+    Lseed3 = 362436069;
+    Lseed4 = 123456789;
+}
+
 /* Seed the generator */
 uint32_t srand16(uint32_t x)
 {

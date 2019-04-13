@@ -149,7 +149,7 @@ int callserver(NODE *np, trigg_cand_t *cand, double timeout)
     send_op(np, OP_HELLO);
     int ecode = rx2(np, 0, timeout);
     if(ecode != VEOK) {
-        sloge(CLOG, "Missing HELLO_ACK packet (%d)", ecode);
+        sloge(CLOG, "Missing HELLO_ACK packet (%d)\n", ecode);
 bad:
         close(np->sd);
         np->sd = INVALID_SOCKET;
@@ -159,7 +159,7 @@ bad:
     np->id2 = get16(np->tx.id2);
     np->opcode = get16(np->tx.opcode);
     if(np->opcode != OP_HELLO_ACK) {
-        sloge(CLOG, "HELLO_ACK is wrong: %d", np->opcode);
+        sloge(CLOG, "HELLO_ACK is wrong: %d\n", np->opcode);
         goto bad;
     }
     put64(cand->server_bnum, np->tx.cblock);  // copy blocknum
