@@ -186,6 +186,7 @@ int get_block3(NODE *np, trigg_cand_t *cand, double timeout)
             goto bad;
         len = get16(np->tx.len);
         slogd(CLOG, "Receive a candidate section, size %d\n", len);
+
         if (len > TRANLEN)
             goto bad;
         if (len) {
@@ -193,7 +194,7 @@ int get_block3(NODE *np, trigg_cand_t *cand, double timeout)
             memcpy(cand->cand_data+cand->cand_len, TRANBUFF(&np->tx), len);
             cand->cand_len += len;
         }
-        if ( 1 ||  (len < 1) || (len > 0 && len < TRANLEN) ) {      ///////////////////////// ***********************
+        if ( (len < 1) || (len > 0 && len < TRANLEN) ) {
             cand->cand_trailer = (btrailer_t *)(cand->cand_data + (cand->cand_len - sizeof(btrailer_t)));
             cand->cand_tm = monotime();
             slogd(CLOG, "Candidate receive done, total size %d\n", cand->cand_len);

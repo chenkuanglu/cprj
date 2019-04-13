@@ -14,6 +14,7 @@
 #include "trigg_miner.h"
 #include "trigg_util.h"
 #include "trigg_crypto.h"
+#include "sha256.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,8 +43,8 @@ int trigg_init(start_info_t *sinfo)
 
     mux_init(&triggm.cand_lock);
 
-    time_t stime = 0x12345678;
-    //time(&stime);
+    time_t stime;
+    time(&stime);
     srand16(stime);
     srand2(stime, 0, 0);
     triggm.retry_num = 5;
@@ -99,36 +100,49 @@ void* thread_trigg_miner(void *arg)
                 break;
         }
 
-#ifdef TRIGG_CPU_MINER
         if (cand_mining.cand_trailer) {
+            slogd(CLOG, "\n");
             long long tgt = trigg_diff_val(cand_mining.cand_trailer->difficulty[0]);
             slogd(CLOG, "diff = %d, target = 0x%016llx\n", cand_mining.cand_trailer->difficulty[0], tgt);
 
-            // ***************** set for debug *****************
-            cand_mining.cand_trailer->bnum[0] = 0x8c;
-            cand_mining.cand_trailer->bnum[1] = 0xca;
-            cand_mining.cand_trailer->difficulty[0] = 15;
-            // ***************** end *****************
-            
+            // gen one work
             trigg_solve(cand_mining.cand_trailer, cand_mining.cand_trailer->difficulty[0], cand_mining.cand_trailer->bnum);
             trigg_gen(cand_mining.cand_trailer->nonce);
             trigg_expand((uint8_t *)triggm.chain, cand_mining.cand_trailer->nonce);
+            trigg_gen((byte *)&triggm.chain[32 + 256]);
 
-            for (;;) {
-                pthread_testcancel();
-                if (trigg_generate((uint8_t *)triggm.chain, cand_mining.cand_trailer->nonce, cand_mining.cand_trailer->difficulty[0]) != NULL)
-                    break;
+            // first hash
+            byte hash[32];
+            sha256((byte *)triggm.chain, (32 + 256 + 16 + 8), hash);
+            char *hstr= abin2hex(hash, 32);
+            slogd(CLOG, "First hash: %s\n", hstr);
+            free(hstr);
+
+            // midstate
+            SHA256_CTX ctx;
+            sha256_init(&ctx);
+            sha256_update(&ctx, (uint8_t *)triggm.chain, 256);
+            int *hp = (int *)ctx.state;
+            for (int i = 0; i < 8; i++) {
+                slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
             }
+
+            // end msg
+            hp = (int *)&triggm.chain[256];
+            for (int i = 0; i < 8; i++) {
+                slogd(CLOG, "end_msg[%02d]: 0x%08x\n", i, hp[i]);
+            }
+
+            nsleep(3);
         } else {
             continue;
         }
-#endif
     }
 }
 
 void* thread_trigg_pool(void *arg)
 {
-#define TRAILER_DEBUG
+//#define TRAILER_DEBUG
 
     (void)arg;
     char ebuf[128];

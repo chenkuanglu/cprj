@@ -99,50 +99,12 @@ char *trigg_generate(byte *chain, byte *nonce, int diff)
 {
     byte h[32];
 
-    static int first = 0;
-    if (first == 0 )
-        slogw(CLOG, "nonceH = 0x%08x\n", *((int*)&chain[32 + 256]));
     trigg_gen(&chain[32 + 256]);
-    if (first == 0 )
-        slogw(CLOG, "gen: nonceH = 0x%08x\n", *((int*)&chain[32 + 256]));
     sha256(chain, (32 + 256 + 16 + 8), h);
-
-#ifdef DEBUG
-    //static int first = 0;
-    char *res;
-    if (first++ == 0) {
-        slogd(CLOG, "first hash:\n");
-        res = abin2hex(h, 32);
-        slogd(CLOG, "%s\n", res);
-        free(res);
-
-        // midstate
-        int *hp = (int *)chain;
-        SHA256_CTX ctx;
-        sha256_init(&ctx);
-        sha256_update(&ctx, chain, 256);
-        hp = (int *)ctx.state;
-        for (int i = 0; i < 8; i++) {
-            slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
-        }
-        //input = tchain + 256
-        hp = (int *)&chain[256];
-        for (int i = 0; i < 8; i++) {
-            slogd(CLOG, "input[%02d]: 0x%08x\n", i, hp[i]);
-        }
-    }
-#endif
-
     if (trigg_eval(h, diff) == NIL) {
         trigg_step((chain + 32 + 256), 16);
         return NULL;
     }
-
-    slogd(CLOG, "hit hash:\n");
-    res = abin2hex(h, 32);
-    slogd(CLOG, "%s\n", res);
-    free(res);
-
     memcpy(nonce + 16, &chain[32 + 256], 16);
 
     return (char *)nonce;
