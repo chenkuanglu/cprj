@@ -1,1 +1,1 @@
-./cprj https://www.mochimap.net:8443/startnodes.lst
+./cprj https://www.mochimap.net/startnodes.lst

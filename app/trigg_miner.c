@@ -69,6 +69,7 @@ void* thread_trigg_miner(void *arg)
 
     (void)arg;
     char ebuf[128];
+    double guard_period = 1.0;
 
     trigg_cand_t cand_mining;
     memset(&cand_mining, 0, sizeof(trigg_cand_t));
@@ -76,7 +77,7 @@ void* thread_trigg_miner(void *arg)
     int cmd;
     for (;;) {
         cmd = TRIGG_CMD_NOTHING;
-        if (thrq_receive(&triggm.thrq_miner, &cmd, sizeof(cmd), 1.0) < 0) {  // 1s timeout
+        if (thrq_receive(&triggm.thrq_miner, &cmd, sizeof(cmd), guard_period) < 0) {  // 1s timeout
             if (errno != ETIMEDOUT) {
                 sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
                 nsleep(0.1);
@@ -95,6 +96,10 @@ void* thread_trigg_miner(void *arg)
                 }
                 mux_unlock(&triggm.cand_lock);
                 // need clean chips?
+                break;
+            case TRIGG_CMD_UP_FRM:
+                break;
+            case TRIGG_CMD_GUARD:
                 break;
             default:
                 break;
@@ -351,7 +356,7 @@ int trigg_download_lst(void)
     }
     curl_easy_cleanup(curl);
 
-    slogd(triggm.log, "peer IPs from url '%s':\n%s", triggm.nodes_lst.url, triggm.nodes_lst.filedata);
+    slogd(triggm.log, "peer IPs from url '%s':\n%s\n", triggm.nodes_lst.url, triggm.nodes_lst.filedata);
     FILE *fp = fopen(triggm.nodes_lst.filename, "w+");
     if (fp) {
         slogd(triggm.log, "write nodes list to file '%s'\n", triggm.nodes_lst.filename);

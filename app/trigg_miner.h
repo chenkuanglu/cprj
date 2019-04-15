@@ -17,8 +17,11 @@ extern "C" {
 #define TRIGG_CMD_NOTHING       0x00000000
 #define TRIGG_CMD_NEW_JOB       0x00000001
 
-#define TRIGG_CMD_START         0x00000002
-#define TRIGG_CMD_STOP          0x00000003
+// miner.h
+#define TRIGG_CMD_UP_FRM        0x00000002
+#define TRIGG_CMD_GUARD         0x00000003
+#define TRIGG_CMD_START         0x00000004
+#define TRIGG_CMD_STOP          0x00000005
 
 typedef struct {
     log_cb_t        *log;
