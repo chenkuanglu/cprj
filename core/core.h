@@ -20,10 +20,19 @@
 #include "../lib/err.h"
 #include "../lib/log.h"
 #include "../lib/thrq.h"
+#include "../lib/que.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif 
+
+#define CORE_SIG_NOTHING        0x7fff0000
+#define CORE_SIG_GUARD          0x7fff0001
+#define CORE_SIG_APP_BASE       0x7fff0100
+
+#define CORE_MSG_TYPE_TIMER     0x7fff0001L
+
+#define CORE_MSG_CMD_EXPIRE     0x7fff1001L
 
 // start info
 typedef struct {
@@ -36,6 +45,14 @@ typedef struct {
 
     thrq_cb_t   tq;
 } start_info_t;
+
+typedef struct {
+    long    type;
+    long    cmd;
+    double  tm;
+    long    len;
+    char    data[];
+} core_msg_t;
 
 typedef void* (*core_thread_t)(void *);
 
@@ -50,6 +67,7 @@ extern log_cb_t *core_log;
 extern int          core_init(void);
 extern void         core_proper_exit(int ec);
 extern void         process_proper_exit(int ec);
+extern int          core_add_guard(thrq_cb_t *thrq);
 
 #ifdef __cplusplus
 }

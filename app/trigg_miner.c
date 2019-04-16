@@ -69,15 +69,18 @@ void* thread_trigg_miner(void *arg)
 
     (void)arg;
     char ebuf[128];
+    char buf[1024];
     double guard_period = 1.0;
 
     trigg_cand_t cand_mining;
     memset(&cand_mining, 0, sizeof(trigg_cand_t));
+    core_add_guard(&triggm.thrq_miner);
 
-    int cmd;
+    core_msg_t *pmsg = (core_msg_t *)buf;
+
     for (;;) {
-        cmd = TRIGG_CMD_NOTHING;
-        if (thrq_receive(&triggm.thrq_miner, &cmd, sizeof(cmd), guard_period) < 0) {  // 1s timeout
+        pmsg->cmd = 0;
+        if (thrq_receive(&triggm.thrq_miner, pmsg, 1024, guard_period) < 0) {  // 1s timeout
             if (errno != ETIMEDOUT) {
                 sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
                 nsleep(0.1);
@@ -85,21 +88,20 @@ void* thread_trigg_miner(void *arg)
             }
         }
 
-        switch (cmd) {
-            case TRIGG_CMD_NOTHING:
+        switch (pmsg->cmd) {
+            case 0:
                 break;
             case TRIGG_CMD_NEW_JOB:
                 mux_lock(&triggm.cand_lock);
                 if (cand_mining.cand_tm < triggm.candidate.cand_tm) {
                     trigg_cand_copy(&cand_mining, &triggm.candidate);
-                    slogd(triggm.log, "New job received\n");
+                    slogw(triggm.log, "New job received\n");
                 }
                 mux_unlock(&triggm.cand_lock);
-                // need clean chips?
                 break;
             case TRIGG_CMD_UP_FRM:
                 break;
-            case TRIGG_CMD_GUARD:
+            case CORE_MSG_CMD_EXPIRE:
                 break;
             default:
                 break;
@@ -159,7 +161,7 @@ void* thread_trigg_pool(void *arg)
     
     int cmd;
     for (;;) {
-        cmd = TRIGG_CMD_NOTHING;
+        cmd = CORE_SIG_NOTHING;
         if (thrq_receive(&triggm.thrq_pool, &cmd, sizeof(cmd), que_tout) < 0) {  // 1s timeout
             if (errno != ETIMEDOUT) {
                 sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
@@ -169,7 +171,7 @@ void* thread_trigg_pool(void *arg)
         }
 
         switch (cmd) {
-            case TRIGG_CMD_NOTHING:
+            case CORE_SIG_NOTHING:
                 break;
             default:
                 break;

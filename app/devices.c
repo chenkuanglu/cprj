@@ -4,12 +4,16 @@
  * @brief   hardware rd/wr/ctrl
  **/
 
-#include "global.h"
 #include "devices.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define FPGA_REG_IMAGE_DATA 0x80
+#define FPGA_REG_ALGO_STAGE 0x41
+#define FPGA_REG_CONSTANT 0x40
+
 
 enum {
     BOARD_CR184_SOCKET = 0,

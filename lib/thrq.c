@@ -246,11 +246,11 @@ int thrq_send(thrq_cb_t *thrq, void *data, int len)
         mux_unlock(&thrq->lock);
         return -1;
     }
-    mux_unlock(&thrq->lock);
-
     if (pthread_cond_signal(&thrq->cond) != 0) {
         return -1;
     }
+    mux_unlock(&thrq->lock);
+
     return 0;
 }
 

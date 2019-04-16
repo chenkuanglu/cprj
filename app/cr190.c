@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+#define FPGA_REG_190_FREQ 0x34 
+
 static pthread_mutex_t cr190_cmd_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int cr190_reset_init(void)
