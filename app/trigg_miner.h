@@ -14,12 +14,15 @@
 extern "C" {
 #endif
 
-#define TRIGG_CMD_NEW_JOB       0x00000101
+#define TRIGG_CMD_NOTHING       0
+#define TRIGG_CMD_NEW_JOB       1
 
-// miner.h
-#define TRIGG_CMD_UP_FRM        0x00000102
-#define TRIGG_CMD_START         0x00000103
-#define TRIGG_CMD_STOP          0x00000104
+#define TRIGG_CMD_UP_FRM        2
+
+#define TRIGG_CMD_START         3
+#define TRIGG_CMD_STOP          4
+
+#define TRIGG_MAX_MSG_BUF       ( 1024 + sizeof(core_msg_t) )
 
 typedef struct {
     log_cb_t        *log;
@@ -38,7 +41,12 @@ typedef struct {
     pthread_t       thr_pool;
     thrq_cb_t       thrq_pool;
 
+    pthread_t       thr_upstream;
+
     int             retry_num;
+
+    int             fd_dev;
+    int             chip_num;
 } trigg_miner_t;
 
 extern trigg_miner_t triggm;

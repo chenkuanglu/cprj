@@ -1,58 +1,56 @@
 // upstream thread
 
 #include "upstream.h"
+#include "trigg_miner.h"
 
-void* upstream_thread(void *arg)
+void* thread_upstream(void *arg)
 {
-    (void)arg;
-    chip_pack_t pack_buf;
+    up_frame_t pack_buf;
     uint8_t *pack_ptr = (uint8_t *)&pack_buf;
-    char ereason[128];
     
-    size_t buf_size = sizeof(msg_header_t) + sizeof(chip_msg_t);
-    uint8_t msg_buf[buf_size*2];
+    const int buf_size = sizeof(core_msg_t) + sizeof(upstream_t);
+    char msg_buf[buf_size];
     
-    msg_header_t *msg_header = (msg_header_t *)msg_buf;
-    chip_msg_t *chip_msg = (chip_msg_t *)(msg_buf + sizeof(msg_header_t));
-    
-    pthread_setcancelstate(PTHREAD_CANCEL_DEFERRED, NULL);
-    while (!IS_MINER_READY()) usleep(100*1000);
+    core_msg_t *msg_header = (core_msg_t *)msg_buf;
+    upstream_t *upstream = (upstream_t *)(msg_buf + sizeof(core_msg_t));
 
+    if (triggm.fd_dev <= 0) {
+        sloge(CLOG, "Invalid serial fd %d\n", triggm.fd_dev);
+        CORE_THR_RETIRE();
+    }
+    
     for (;;) {
-        // wait/read serial data 
         int rcv = 0, rcv_sum = 0;
         while (1) {
             pthread_testcancel();
-			if ((rcv = ser_recieve(server_cb.fd_serial, &pack_ptr[rcv_sum], 1)) <= 0) {
+			if ((rcv = ser_receive(triggm.fd_dev, &pack_ptr[rcv_sum], 1)) <= 0) {
+                nsleep(0.01);
                 continue;
             }
             rcv_sum += rcv;
             if (rcv_sum >= 6) 
                 break;
 		}
-        logi("UP FRM: %03d,0x%02x,0x%08x", pack_buf.id, pack_buf.reg, pack_buf.data);
+        slogi(CLOG, "UP FRM: %03d,0x%02x,0x%08x\n", pack_buf.id, pack_buf.addr, pack_buf.data);
         
         // chip id check 
-        if ( (server_cb.opt_core_num > 0) && (pack_buf.id > server_cb.opt_core_num) ) {
-            loge("error, invalid chip id %d", pack_buf.id);
+        if ( (triggm.chip_num > 0) && (pack_buf.id > triggm.chip_num) ) {
+            sloge(CLOG, "Invalid chip id %03d\n", pack_buf.id);
             continue;
         }
         
-        msg_header->sid_snd = BASE_SID + server_id;
-        msg_header->algo_id = MSG_TYPE_UPSTREAM;
-        msg_header->id  = 0;        // itself
-        msg_header->cmd     = 0;                    // not use 
-        gettimeofday(&(msg_header->time), NULL);
-        msg_header->len     = sizeof(chip_msg_t);
+        msg_header->type = 0;
+        msg_header->cmd = TRIGG_CMD_UP_FRM;
+        msg_header->tm  = monotime();
+        msg_header->len = sizeof(upstream_t);
         
-        chip_msg->id = pack_buf.id;
-        chip_msg->reg = pack_buf.reg;
-        chip_msg->data = pack_buf.data;
+        upstream->id = pack_buf.id;
+        upstream->addr = pack_buf.addr;
+        upstream->data = pack_buf.data;
 
-        if (thrq_send(&server_cb.que_core, msg_buf, (sizeof(msg_header_t) + sizeof(chip_msg_t))) != 0) {
-            sprintf(ereason, "thrq_send fail: upstream thread fail to send to 'que_core'");
-            server_proper_exit(ereason);
-            THREAD_RETIRE();
+        if (thrq_send(&triggm.thrq_miner, msg_buf, buf_size) != 0) {
+            sloge(CLOG, "upstream send msg fail\n");
+            nsleep(0.1);
         }
     }
 }

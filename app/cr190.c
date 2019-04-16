@@ -5,6 +5,8 @@
  **/
 
 #include "cr190.h"
+#include "serial.h"
+#include "../core/core.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -105,7 +107,7 @@ int cr190_read(int fd, uint8_t id, uint8_t reg)
     ser_send(fd, buffer, sizeof(buffer));
     pthread_mutex_unlock(&cr190_cmd_mutex);
 
-    logd("read  id=%03d, reg=0x%02x", id, reg);
+    slogd(CLOG, "read  id=%03d, reg=0x%02x\n", id, reg);
 
     return 0;
 }
@@ -124,7 +126,7 @@ int cr190_write(int fd, uint8_t id, uint8_t reg, uint32_t data)
     ser_send(fd, buffer, sizeof(buffer));
     pthread_mutex_unlock(&cr190_cmd_mutex);
 
-    logd("write id=%03d, reg=0x%02x, data=0x%08x", id, reg, data);
+    slogd(CLOG, "write id=%03d, reg=0x%02x, data=0x%08x\n", id, reg, data);
 
     return 0;
 }
@@ -148,7 +150,7 @@ int cr190_write_l(int fd, uint8_t id, uint8_t reg, char *data, int len)
     ser_send(fd, data, len);
     pthread_mutex_unlock(&cr190_cmd_mutex);
 
-    logd("write id=%03d, reg=0x%02x,  len=%d", id, reg, len);
+    slogd(CLOG, "write id=%03d, reg=0x%02x,  len=%d\n", id, reg, len);
 
     return 0;
 }

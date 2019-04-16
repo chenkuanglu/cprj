@@ -15,6 +15,7 @@
 #include "trigg_util.h"
 #include "trigg_crypto.h"
 #include "sha256.h"
+#include "upstream.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,9 +38,9 @@ int trigg_init(start_info_t *sinfo)
     triggm.nodes_lst.filename = strdup("startnodes.lst");
 
     thrq_init(&triggm.thrq_miner);
-    thrq_set_mpool(&triggm.thrq_miner, 0, 32);
+    thrq_set_mpool(&triggm.thrq_miner, 0, 128);
     thrq_init(&triggm.thrq_pool);
-    thrq_set_mpool(&triggm.thrq_pool, 0, 32);
+    thrq_set_mpool(&triggm.thrq_pool, 0, 128);
 
     mux_init(&triggm.cand_lock);
 
@@ -48,6 +49,11 @@ int trigg_init(start_info_t *sinfo)
     srand16(stime);
     srand2(stime, 0, 0);
     triggm.retry_num = 5;
+
+    //if (ser_open("/dev/ttyAMA0", 115200) < 0) {
+    //    sloge(triggm.log, "open '/dev/ttyAMA0' fail: %s\n", strerror(errno));
+    //    return -1;
+    //}
 
     if (pthread_create(&triggm.thr_miner, NULL, thread_trigg_miner, &triggm) != 0) {
         sloge(triggm.log, "create 'thread_trigg_miner' fail: %s\n", strerror(errno));
@@ -58,6 +64,11 @@ int trigg_init(start_info_t *sinfo)
         return -1;
     }
 
+    if (pthread_create(&triggm.thr_upstream, NULL, thread_upstream, &triggm) != 0) {
+        sloge(triggm.log, "create 'thread_upstream' fail: %s\n", strerror(errno));
+        return -1;
+    }
+
     //trigg_start();
 
     return 0;
@@ -65,22 +76,19 @@ int trigg_init(start_info_t *sinfo)
 
 void* thread_trigg_miner(void *arg)
 {
-#define TRIGG_CPU_MINER
-
-    (void)arg;
     char ebuf[128];
-    char buf[1024];
-    double guard_period = 1.0;
+    char msg_buf[TRIGG_MAX_MSG_BUF];
 
     trigg_cand_t cand_mining;
     memset(&cand_mining, 0, sizeof(trigg_cand_t));
+
     core_add_guard(&triggm.thrq_miner);
 
-    core_msg_t *pmsg = (core_msg_t *)buf;
+    core_msg_t *pmsg = (core_msg_t *)msg_buf;
 
     for (;;) {
-        pmsg->cmd = 0;
-        if (thrq_receive(&triggm.thrq_miner, pmsg, 1024, guard_period) < 0) {  // 1s timeout
+        pmsg->cmd = TRIGG_CMD_NOTHING;
+        if (thrq_receive(&triggm.thrq_miner, msg_buf, TRIGG_MAX_MSG_BUF, 0) < 0) {
             if (errno != ETIMEDOUT) {
                 sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
                 nsleep(0.1);
@@ -89,23 +97,27 @@ void* thread_trigg_miner(void *arg)
         }
 
         switch (pmsg->cmd) {
-            case 0:
+            case TRIGG_CMD_NOTHING:
                 break;
             case TRIGG_CMD_NEW_JOB:
                 mux_lock(&triggm.cand_lock);
                 if (cand_mining.cand_tm < triggm.candidate.cand_tm) {
                     trigg_cand_copy(&cand_mining, &triggm.candidate);
-                    slogw(triggm.log, "New job received\n");
+                    slog(triggm.log, CCL_CYAN "New block 0x%016llx received\n" CCL_END, 
+                            (int64_t)(cand_mining.cand_trailer->bnum));
                 }
                 mux_unlock(&triggm.cand_lock);
                 break;
             case TRIGG_CMD_UP_FRM:
+                slogw(CLOG, "UP FRM: ...\n");
                 break;
             case CORE_MSG_CMD_EXPIRE:
+                slogw(CLOG, "core msg timer out 1s...\n");
                 break;
             default:
                 break;
         }
+        continue;   // ##############################
 
         if (cand_mining.cand_trailer) {
             slogd(CLOG, "\n");
@@ -149,20 +161,22 @@ void* thread_trigg_miner(void *arg)
 
 void* thread_trigg_pool(void *arg)
 {
-//#define TRAILER_DEBUG
-
-    (void)arg;
+#define TRAILER_DEBUG
     char ebuf[128];
-    double que_tout = 1.0;
+    char msg_buf[TRIGG_MAX_MSG_BUF];
+    const double QUE_TIMEOUT = 1.0;     // 1s
     double tm_nlst = 0;
     double tm_cand = 0;
+
     trigg_cand_t cand;
     memset(&cand, 0, sizeof(cand));
     
-    int cmd;
+    core_msg_t *pmsg = (core_msg_t *)msg_buf;
+    core_msg_t msgx;
+
     for (;;) {
-        cmd = CORE_SIG_NOTHING;
-        if (thrq_receive(&triggm.thrq_pool, &cmd, sizeof(cmd), que_tout) < 0) {  // 1s timeout
+        pmsg->cmd = TRIGG_CMD_NOTHING;
+        if (thrq_receive(&triggm.thrq_pool, msg_buf, TRIGG_MAX_MSG_BUF, QUE_TIMEOUT) < 0) {  // 1s timeout
             if (errno != ETIMEDOUT) {
                 sloge(triggm.log, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
                 nsleep(0.1);
@@ -170,8 +184,8 @@ void* thread_trigg_pool(void *arg)
             }
         }
 
-        switch (cmd) {
-            case CORE_SIG_NOTHING:
+        switch (pmsg->cmd) {
+            case TRIGG_CMD_NOTHING:
                 break;
             default:
                 break;
@@ -198,6 +212,7 @@ void* thread_trigg_pool(void *arg)
 
         // get new job from pool every 600s
         if (tm_cand == 0 || monotime() - tm_cand > 600) {
+#ifndef TRAILER_DEBUG
             int retry = triggm.retry_num;
             while (trigg_get_cblock(&cand, CORELISTLEN) != 0) {     // 'cand->cand_data' may be destroyed
                 if (--retry <= 0)
@@ -208,8 +223,13 @@ void* thread_trigg_pool(void *arg)
             mux_lock(&triggm.cand_lock);
             trigg_cand_copy(&triggm.candidate, &cand);
             mux_unlock(&triggm.cand_lock);
+#else
+            tm_cand = monotime();
+            triggm.candidate.cand_data = (char *)realloc(triggm.candidate.cand_data, 1024);
+            triggm.candidate.cand_len = 1024;
+            triggm.candidate.cand_tm = monotime();
+            triggm.candidate.cand_trailer = (btrailer_t*)triggm.candidate.cand_data;
 
-#ifdef TRAILER_DEBUG
             static btrailer_t bt;
             FILE *fp = fopen("./candidate", "rb");
             if (fp == NULL) {
@@ -237,8 +257,11 @@ void* thread_trigg_pool(void *arg)
             }
 #endif
 
-            cmd = TRIGG_CMD_NEW_JOB;
-            thrq_send(&triggm.thrq_miner, &cmd, sizeof(cmd));
+            msgx.type = 0;
+            msgx.cmd = TRIGG_CMD_NEW_JOB;
+            msgx.tm = monotime();
+            msgx.len = 0;
+            thrq_send(&triggm.thrq_miner, &msgx, sizeof(msgx)+msgx.len);
         }
     }
 }

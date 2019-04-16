@@ -111,6 +111,7 @@ extern int          log_printf      (const char *format, ...);
 #else
 #define logd(format, ...)    
 #endif
+#define log(format, ...)        log_printf(format, ##__VA_ARGS__)
 #define logi(format, ...)       log_printf(format, ##__VA_ARGS__)
 #define logn(format, ...)       log_printf(CCL_WHITE_HL format CCL_END, ##__VA_ARGS__)
 #define logw(format, ...)       log_printf(CCL_YELLOW format CCL_END, ##__VA_ARGS__)
@@ -122,6 +123,7 @@ extern int          log_printf      (const char *format, ...);
 #else
 #define slogd(s, format, ...)    
 #endif
+#define slog(s, format, ...)    log_fprintf(s, format, ##__VA_ARGS__)
 #define slogi(s, format, ...)   log_fprintf(s, format, ##__VA_ARGS__)
 #define slogn(s, format, ...)   log_fprintf(s, CCL_WHITE_HL format CCL_END, ##__VA_ARGS__)
 #define slogw(s, format, ...)   log_fprintf(s, CCL_YELLOW format CCL_END, ##__VA_ARGS__)

@@ -8,6 +8,7 @@
 #define __UPSTREAM_H__
 
 #include "../core/core.h"
+#include "serial.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,17 +17,19 @@ extern "C" {
 // upstream msg 
 typedef struct {
     int         id;
-    int         reg;
+    int         addr;
     uint32_t    data;
-} chip_msg_t;
+} upstream_t;
 
 // hardware msg packet 
-struct protocal_packet {
+struct __up_frame {
     uint32_t    data;
     uint8_t     id;
-    uint8_t     reg;
+    uint8_t     addr;
 } __attribute__((__packed__));
-typedef struct protocal_packet chip_pack_t;
+typedef struct __up_frame up_frame_t;
+
+extern void* thread_upstream(void *arg);
 
 #ifdef __cplusplus
 }

@@ -26,13 +26,12 @@
 extern "C" {
 #endif 
 
-#define CORE_SIG_NOTHING        0x7fff0000
-#define CORE_SIG_GUARD          0x7fff0001
-#define CORE_SIG_APP_BASE       0x7fff0100
+#define CORE_MSG_TYPE_BASE      ( -1 )
+#define CORE_MSG_CMD_BASE       ( -256 )
 
-#define CORE_MSG_TYPE_TIMER     0x7fff0001L
+#define CORE_MSG_TYPE_TIMER     ( CORE_MSG_TYPE_BASE - 1 )
 
-#define CORE_MSG_CMD_EXPIRE     0x7fff1001L
+#define CORE_MSG_CMD_EXPIRE     ( CORE_MSG_CMD_BASE - 1 )
 
 // start info
 typedef struct {
