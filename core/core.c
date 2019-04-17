@@ -126,15 +126,14 @@ void core_loop(void)
 
 int core_add_guard(thrq_cb_t *thrq)
 {
-    int res = que_insert_tail(&core_info.que_guard, &thrq, sizeof(thrq_cb_t *));
-    return res;
+    return que_insert_tail(&core_info.que_guard, &thrq, sizeof(thrq_cb_t *));
 }
 
 static void* thread_guard(void *arg)
 {
-    (void)arg;
     pthread_t tid = pthread_self();
     pthread_detach(tid);
+
     uint32_t count = 0;
     que_cb_t *pq = &core_info.que_guard;
     thrq_cb_t **qsend;
@@ -152,7 +151,9 @@ static void* thread_guard(void *arg)
             que_elm_t *var;
             QUE_FOREACH(var, pq) {
                 qsend = (thrq_cb_t **)var->data;
+                loge("qsend c=%d", thrq_count(*qsend));
                 thrq_send(*qsend, &cmsg, sizeof(cmsg));
+                loge("qsend c=%d", thrq_count(*qsend));
             }    
         }
     }
