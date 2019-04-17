@@ -45,6 +45,7 @@ typedef struct {
 
     int             retry_num;
 
+    char            *file_dev;
     int             fd_dev;
     int             chip_num;
 } trigg_miner_t;

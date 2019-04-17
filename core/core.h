@@ -37,12 +37,7 @@ extern "C" {
 typedef struct {
     int         argc;
     char**      argv;
-
-    pid_t       pid;        // pid of process
-    pthread_t   tid;        // thread id of main thread
     double      tm;         // time of app startup
-
-    thrq_cb_t   tq;
 } start_info_t;
 
 typedef struct {
@@ -63,9 +58,9 @@ extern log_cb_t *core_log;
 
 #define CLOG        core_log 
 
-extern int          core_init(void);
+extern int          core_init(start_info_t *sinfo);
+extern void         core_loop(void);
 extern void         core_proper_exit(int ec);
-extern void         process_proper_exit(int ec);
 extern int          core_add_guard(thrq_cb_t *thrq);
 
 #ifdef __cplusplus

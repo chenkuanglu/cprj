@@ -35,6 +35,7 @@ int trigg_init(start_info_t *sinfo)
     triggm.log = CLOG;
 
     triggm.nodes_lst.url = sinfo->argv[1];
+    triggm.file_dev = sinfo->argv[2];
     triggm.nodes_lst.filename = strdup("startnodes.lst");
 
     thrq_init(&triggm.thrq_miner);
@@ -48,12 +49,12 @@ int trigg_init(start_info_t *sinfo)
     time(&stime);
     srand16(stime);
     srand2(stime, 0, 0);
-    triggm.retry_num = 5;
+    triggm.retry_num = 32;
 
-    //if (ser_open("/dev/ttyAMA0", 115200) < 0) {
-    //    sloge(triggm.log, "open '/dev/ttyAMA0' fail: %s\n", strerror(errno));
-    //    return -1;
-    //}
+    if ((triggm.fd_dev = ser_open(triggm.file_dev, 115200)) < 0) {
+        sloge(triggm.log, "open '%s' fail: %s\n", triggm.file_dev, strerror(errno));
+        return -1;
+    }
 
     if (pthread_create(&triggm.thr_miner, NULL, thread_trigg_miner, &triggm) != 0) {
         sloge(triggm.log, "create 'thread_trigg_miner' fail: %s\n", strerror(errno));
@@ -103,16 +104,16 @@ void* thread_trigg_miner(void *arg)
                 mux_lock(&triggm.cand_lock);
                 if (cand_mining.cand_tm < triggm.candidate.cand_tm) {
                     trigg_cand_copy(&cand_mining, &triggm.candidate);
-                    slog(triggm.log, CCL_CYAN "New block 0x%016llx received\n" CCL_END, 
-                            (int64_t)(cand_mining.cand_trailer->bnum));
+                    slog(triggm.log, CCL_CYAN "New block 0x%08x%08x received\n" CCL_END, 
+                            *((int32_t*)(cand_mining.cand_trailer->bnum+4)), *((int32_t*)(cand_mining.cand_trailer->bnum)));
                 }
                 mux_unlock(&triggm.cand_lock);
                 break;
             case TRIGG_CMD_UP_FRM:
-                slogw(CLOG, "UP FRM: ...\n");
+                slogw(CLOG, "TRIGG_CMD_UP_FRM...\n");
                 break;
             case CORE_MSG_CMD_EXPIRE:
-                slogw(CLOG, "core msg timer out 1s...\n");
+                slogw(CLOG, "CORE_MSG_CMD_EXPIRE...\n");
                 break;
             default:
                 break;
@@ -196,7 +197,7 @@ void* thread_trigg_pool(void *arg)
             int retry = triggm.retry_num;
             while (trigg_download_lst() != 0) {
                 if (--retry <= 0)
-                    process_proper_exit(errno);
+                    core_proper_exit(errno);
             }
             tm_nlst = monotime();
 
@@ -216,7 +217,7 @@ void* thread_trigg_pool(void *arg)
             int retry = triggm.retry_num;
             while (trigg_get_cblock(&cand, CORELISTLEN) != 0) {     // 'cand->cand_data' may be destroyed
                 if (--retry <= 0)
-                    process_proper_exit(errno);
+                    core_proper_exit(errno);
             }
             tm_cand = monotime();
 

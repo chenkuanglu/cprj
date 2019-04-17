@@ -45,8 +45,8 @@ retry:
 		slogw(CLOG, "Connect() to coreip fail\n");
 		return INVALID_SOCKET;
 	}
-	slogd(CLOG, "Connect() to coreip ok.\n");
 out:
+	slogd(CLOG, "Connect() to coreip ok.\n");
 	nonblock(sd);
 	return sd;
 }
@@ -227,7 +227,7 @@ bad:
 int trigg_get_cblock(trigg_cand_t *cand, int retry)
 {
     NODE node;
-    const double timeout = 10.0;     // 3s timeout
+    const double timeout = 10.0;     // 10s timeout
     slogd(CLOG, "\n");
     slogd(CLOG, "Start getting new candidate...\n");
 

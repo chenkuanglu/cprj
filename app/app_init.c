@@ -11,8 +11,6 @@
 extern "C" {
 #endif 
 
-log_cb_t *init_log;
-
 #ifdef PRINT_ARGS
 static void print_args(int argc, char **argv)
 {
@@ -25,13 +23,13 @@ static void print_args(int argc, char **argv)
     for (int i=0; i<argc; i++) {
         sum += strlen(argv[i]);
     }
-    if ((buf = (char *)malloc(sum+1)) == NULL)
+    if ((buf = (char *)malloc(sum+argc+1)) == NULL)     // space between argv[i]
         return;
     num = sprintf(buf, "%s", pre);
     for (int i=0; i<argc; i++) {
         num += sprintf(buf+num, "%s ", argv[i]);
     }
-    slogi(init_log, "%s", buf);
+    slogi(CLOG, "%s\n", buf);
     free(buf);
 }
 #endif
@@ -39,8 +37,7 @@ static void print_args(int argc, char **argv)
 // application init
 void app_init(start_info_t *sinfo)
 {
-    init_log = CLOG;
-    slogd(init_log, "app init...\n");
+    slogd(CLOG, "app init...\n");
 
 #ifdef PRINT_ARGS
     print_args(sinfo->argc, sinfo->argv);
@@ -52,7 +49,7 @@ void app_init(start_info_t *sinfo)
 
 void app_proper_exit(int ec)
 {
-    slogd(init_log, "app_proper_exit(%d)...\n", ec);
+    slogd(CLOG, "app_proper_exit(%d)...\n", ec);
 }
 
 #ifdef __cplusplus
