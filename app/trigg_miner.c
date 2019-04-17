@@ -22,15 +22,18 @@ extern "C" {
 #endif 
 
 trigg_miner_t triggm;
+chip_info_t chip_info[256];
 
 void* thread_trigg_miner(void *arg);
 void* thread_trigg_pool(void *arg);
 int trigg_coreipl_copy(uint32_t *dst, uint32_t *src);
 int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src);
-void trigg_solve(btrailer_t *bt, int diff, uint8_t *bnum);
+void trigg_solve(trigg_work_t *work);
 
 int trigg_init(start_info_t *sinfo)
 {
+    memset(&chip_info, 0, sizeof(chip_info));
+
     memset(&triggm, 0, sizeof(trigg_miner_t));
     triggm.log = CLOG;
 
@@ -69,7 +72,72 @@ int trigg_init(start_info_t *sinfo)
         return -1;
     }
 
-    //trigg_start();
+    return 0;
+}
+
+int trigg_gen_work(trigg_work_t *work, trigg_cand_t *cand)
+{
+    trigg_cand_copy(work->cand, cand);
+
+    btrailer_t *bt = work->cand->cand_trailer;
+    trigg_solve(work);
+    trigg_gen(bt->nonce);
+    trigg_expand((uint8_t *)work->chain, bt->nonce);
+    trigg_gen((byte *)&work->chain[32 + 256]);
+
+    return 0;
+}
+
+int trigg_post_constant(int id, trigg_work_t *work)
+{
+    work->base = 0x00000000;
+    //work->end = 0x0fffffff;
+    //work->target = 0;
+    //work->midstate[] = 
+    //work->ending_msg[] = 
+
+    // write(id,addr,data);
+    return 0;
+}
+
+int trigg_start(trigg_cand_t *cand)
+{
+    // stop_all_chips();
+    
+    for (int i=0; i<triggm.chip_num; i++) {
+        for (int j=0; j<CHIP_MAX_OUTSTANDING; j++) {
+            trigg_gen_work(chip_info[i].work + j, cand);
+            trigg_post_constant(i+1, chip_info[i].work + j);
+        }
+        chip_info[i].work_ix = 0;
+    }
+
+    return 0;
+}
+
+int trigg_upstream_proc(upstream_t *msg)
+{
+    slogd(CLOG, "process id %03d addr 0x%02d data 0x%08x", msg->id, msg->addr, msg->data);
+
+    switch (msg->addr) {
+        case 0x0c:
+            break;
+
+        case 0x64:
+            break;
+
+        case 0x68:
+            break;
+
+        case 0x69:
+            break;
+            
+        case 0x6a:
+            break;
+
+        default:
+            break;
+    }
 
     return 0;
 }
@@ -85,6 +153,7 @@ void* thread_trigg_miner(void *arg)
     core_add_guard(&triggm.thrq_miner);
 
     core_msg_t *pmsg = (core_msg_t *)msg_buf;
+    upstream_t *upstream = (upstream_t *)pmsg->data;
 
     for (;;) {
         pmsg->cmd = TRIGG_CMD_NOTHING;
@@ -107,9 +176,14 @@ void* thread_trigg_miner(void *arg)
                             *((int32_t*)(cand_mining.cand_trailer->bnum+4)), *((int32_t*)(cand_mining.cand_trailer->bnum)));
                 }
                 mux_unlock(&triggm.cand_lock);
+                if (!triggm.started) {
+                    triggm.started = 1;
+                    trigg_start(&cand_mining);
+                }
                 break;
             case TRIGG_CMD_UP_FRM:
                 slogw(CLOG, "TRIGG_CMD_UP_FRM...\n");
+                trigg_upstream_proc(upstream);
                 break;
             case CORE_MSG_CMD_EXPIRE:
                 slogw(CLOG, "CORE_MSG_CMD_EXPIRE...\n");
@@ -117,45 +191,44 @@ void* thread_trigg_miner(void *arg)
             default:
                 break;
         }
-        continue;   // ##############################
 
-        if (cand_mining.cand_trailer) {
-            slogd(CLOG, "\n");
-            long long tgt = trigg_diff_val(cand_mining.cand_trailer->difficulty[0]);
-            slogd(CLOG, "diff = %d, target = 0x%016llx\n", cand_mining.cand_trailer->difficulty[0], tgt);
+        //if (cand_mining.cand_trailer) {
+        //    slogd(CLOG, "\n");
+        //    long long tgt = trigg_diff_val(cand_mining.cand_trailer->difficulty[0]);
+        //    slogd(CLOG, "diff = %d, target = 0x%016llx\n", cand_mining.cand_trailer->difficulty[0], tgt);
 
-            // gen one work
-            trigg_solve(cand_mining.cand_trailer, cand_mining.cand_trailer->difficulty[0], cand_mining.cand_trailer->bnum);
-            trigg_gen(cand_mining.cand_trailer->nonce);
-            trigg_expand((uint8_t *)triggm.chain, cand_mining.cand_trailer->nonce);
-            trigg_gen((byte *)&triggm.chain[32 + 256]);
+        //    // gen one work
+        //    trigg_solve(cand_mining.cand_trailer, cand_mining.cand_trailer->difficulty[0], cand_mining.cand_trailer->bnum);
+        //    trigg_gen(cand_mining.cand_trailer->nonce);
+        //    trigg_expand((uint8_t *)triggm.chain, cand_mining.cand_trailer->nonce);
+        //    trigg_gen((byte *)&triggm.chain[32 + 256]);
 
-            // first hash
-            byte hash[32];
-            sha256((byte *)triggm.chain, (32 + 256 + 16 + 8), hash);
-            char *hstr= abin2hex(hash, 32);
-            slogd(CLOG, "First hash: %s\n", hstr);
-            free(hstr);
+        //    // first hash
+        //    byte hash[32];
+        //    sha256((byte *)triggm.chain, (32 + 256 + 16 + 8), hash);
+        //    char *hstr= abin2hex(hash, 32);
+        //    slogd(CLOG, "First hash: %s\n", hstr);
+        //    free(hstr);
 
-            // midstate
-            SHA256_CTX ctx;
-            sha256_init(&ctx);
-            sha256_update(&ctx, (uint8_t *)triggm.chain, 256);
-            int *hp = (int *)ctx.state;
-            for (int i = 0; i < 8; i++) {
-                slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
-            }
+        //    // midstate
+        //    SHA256_CTX ctx;
+        //    sha256_init(&ctx);
+        //    sha256_update(&ctx, (uint8_t *)triggm.chain, 256);
+        //    int *hp = (int *)ctx.state;
+        //    for (int i = 0; i < 8; i++) {
+        //        slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
+        //    }
 
-            // end msg
-            hp = (int *)&triggm.chain[256];
-            for (int i = 0; i < 8; i++) {
-                slogd(CLOG, "end_msg[%02d]: 0x%08x\n", i, hp[i]);
-            }
+        //    // end msg
+        //    hp = (int *)&triggm.chain[256];
+        //    for (int i = 0; i < 8; i++) {
+        //        slogd(CLOG, "end_msg[%02d]: 0x%08x\n", i, hp[i]);
+        //    }
 
-            nsleep(3);
-        } else {
-            continue;
-        }
+        //    nsleep(3);
+        //} else {
+        //    continue;
+        //}
     }
 }
 
@@ -266,16 +339,18 @@ void* thread_trigg_pool(void *arg)
     }
 }
 
-void trigg_solve(btrailer_t *bt, int diff, uint8_t *bnum)
+void trigg_solve(trigg_work_t *work)
 {
-    triggm.diff = diff;
-    memset(triggm.chain + 32, 0, (256 + 16));
-    memcpy(triggm.chain, bt->mroot, 32);
-    memcpy(triggm.chain + 32 + 256 + 16, bnum, 8);
+    btrailer_t *bt = work->cand->cand_trailer;
+
+    memset(work->chain + 32, 0, (256 + 16));
+    memcpy(work->chain, bt->mroot, 32);
+    memcpy(work->chain + 32 + 256 + 16, bt->bnum, 8);
+
     put16(bt->nonce + 0, rand16());                 // tainler's nonceL[16] (low nonce) as xnonce
     put16(bt->nonce + 2, rand16());
-    put16(triggm.chain + (32 + 256), rand16());     // tchain's nonceH[16] (high nonce) for hardware calc
-    put16(triggm.chain + (32 + 258), rand16());
+    put16(work->chain + (32 + 256), rand16());      // tchain's nonceH[16] (high nonce) for hardware calc
+    put16(work->chain + (32 + 258), rand16());
 #ifdef DEBUG
     int *p = (int*)bt->nonce;
     slogd(CLOG, "tailer nonce low: 0x%08x\n", p[0]);

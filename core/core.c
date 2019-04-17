@@ -96,6 +96,8 @@ int core_init(start_info_t *sinfo)
 static void __core_stall(void)
 {
     // stop timer sig to app
+    // 外部队列可能随时释放，core的安全性受app影响太大
+    // 要么写成回调函数，要么队列对象必须放在core内部，由core来管理
 }
 
 static void __core_exit(int ec)

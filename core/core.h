@@ -61,6 +61,7 @@ extern log_cb_t *core_log;
 extern int          core_init(start_info_t *sinfo);
 extern void         core_loop(void);
 extern void         core_proper_exit(int ec);
+
 extern int          core_add_guard(thrq_cb_t *thrq);
 
 #ifdef __cplusplus

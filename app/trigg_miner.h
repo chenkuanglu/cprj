@@ -48,7 +48,31 @@ typedef struct {
     char            *file_dev;
     int             fd_dev;
     int             chip_num;
+
+    int             started;
 } trigg_miner_t;
+
+typedef struct {
+    trigg_cand_t    *cand;
+    tchain_t        chain;
+
+    uint32_t        base;
+    uint32_t        end;
+    uint32_t        target;
+    char            midstate[32];
+    char            *ending_msg;
+} trigg_work_t;
+
+#define CHIP_MAX_OUTSTANDING    2
+
+typedef struct {
+    trigg_work_t    work[CHIP_MAX_OUTSTANDING];
+    int             work_ix;
+    uint32_t        count_hit;
+    uint32_t        count_err;
+
+    double          hashrate;
+} chip_info_t;
 
 extern trigg_miner_t triggm;
 
