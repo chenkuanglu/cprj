@@ -80,7 +80,7 @@ int que_set_mpool(que_cb_t *que, size_t n, size_t data_size)
     if (mux_lock(&que->lock) < 0)
         return -1;
     mpool_destroy(&que->mpool);
-    if (mpool_init(&que->mpool, n, data_size) != 0) {
+    if (mpool_init(&que->mpool, n, QUE_BLOCK_SIZE(data_size)) != 0) {
         mux_unlock(&que->lock);
         return -1;
     }
@@ -160,7 +160,7 @@ int que_insert_head(que_cb_t *que, void *data, int len)
     }
 
     /* memoy allocate */
-    que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, (sizeof(que_elm_t) + len));
+    que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, QUE_BLOCK_SIZE(len));
     if (elm == 0) {
         mux_unlock(&que->lock);
         errno = ENOMEM;
@@ -201,7 +201,7 @@ int que_insert_tail(que_cb_t *que, void *data, int len)
         return -1;
     }
 
-    que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, (sizeof(que_elm_t) + len));
+    que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, QUE_BLOCK_SIZE(len));
     if (elm == 0) {
         mux_unlock(&que->lock);
         errno = EAGAIN;
@@ -241,7 +241,7 @@ int QUE_INSERT_AFTER(que_cb_t *que, que_elm_t *list_elm, void *data, int len)
         return -1;
     }
 
-    que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, (sizeof(que_elm_t) + len));
+    que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, QUE_BLOCK_SIZE(len));
     if (elm == 0) {
         errno = ENOMEM;
         return -1;
@@ -277,7 +277,7 @@ int QUE_INSERT_BEFORE(que_cb_t *que, que_elm_t *list_elm, void *data, int len)
         return -1;
     }
 
-    que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, (sizeof(que_elm_t) + len));
+    que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, QUE_BLOCK_SIZE(len));
     if (elm == 0) {
         errno = ENOMEM;
         return -1;

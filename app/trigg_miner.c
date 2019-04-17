@@ -53,7 +53,6 @@ int trigg_init(start_info_t *sinfo)
 
     if ((triggm.fd_dev = ser_open(triggm.file_dev, 115200)) < 0) {
         sloge(triggm.log, "open '%s' fail: %s\n", triggm.file_dev, strerror(errno));
-        return -1;
     }
 
     if (pthread_create(&triggm.thr_miner, NULL, thread_trigg_miner, &triggm) != 0) {

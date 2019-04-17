@@ -65,6 +65,8 @@ typedef struct {
     int                 max_size;
 } thrq_cb_t;
 
+#define THRQ_BLOCK_SIZE(data_size)      (sizeof(thrq_elm_t) + (data_size))
+
 extern int          thrq_init           (thrq_cb_t *thrq);
 extern thrq_cb_t*   thrq_new            (thrq_cb_t **thrq);
 extern void         thrq_destroy        (thrq_cb_t *thrq);

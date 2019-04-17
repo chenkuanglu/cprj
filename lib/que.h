@@ -91,6 +91,8 @@ typedef struct {
 #define QUE_DATA_ELM(data)              ( QUE_CONTAINER_OF(data) )
 #define QUE_ELM_DATA(elm, data_type)    ( *((data_type *)((elm)->data)) )
 
+#define QUE_BLOCK_SIZE(data_size)       (sizeof(que_elm_t) + (data_size))
+
 /* lock/unlock queue, thread safe */
 #define que_lock(que)          mux_lock(&que->lock)
 #define que_unlock(que)        mux_unlock(&que->lock)

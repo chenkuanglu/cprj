@@ -135,7 +135,7 @@ int thrq_set_mpool(thrq_cb_t *thrq, size_t n, size_t data_size)
     if (mux_lock(&thrq->lock) < 0)
         return -1;
     mpool_destroy(&thrq->mpool);
-    if (mpool_init(&thrq->mpool, n, data_size) != 0) {
+    if (mpool_init(&thrq->mpool, n, THRQ_BLOCK_SIZE(data_size)) != 0) {
         mux_unlock(&thrq->lock);
         return -1;
     }
@@ -214,7 +214,7 @@ static int thrq_insert_tail(thrq_cb_t *thrq, void *data, int len)
         return -1;
     }
 
-    thrq_elm_t *elm = (thrq_elm_t*)mpool_malloc(&thrq->mpool, (sizeof(thrq_elm_t) + len));
+    thrq_elm_t *elm = (thrq_elm_t*)mpool_malloc(&thrq->mpool, THRQ_BLOCK_SIZE(len));
     if (elm == 0) {
         mux_unlock(&thrq->lock);
         errno = ENOMEM;

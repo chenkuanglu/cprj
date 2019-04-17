@@ -151,9 +151,7 @@ static void* thread_guard(void *arg)
             que_elm_t *var;
             QUE_FOREACH(var, pq) {
                 qsend = (thrq_cb_t **)var->data;
-                loge("qsend c=%d", thrq_count(*qsend));
                 thrq_send(*qsend, &cmsg, sizeof(cmsg));
-                loge("qsend c=%d", thrq_count(*qsend));
             }    
         }
     }
