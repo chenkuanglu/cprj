@@ -16,6 +16,7 @@
 #include "trigg_crypto.h"
 #include "sha256.h"
 #include "upstream.h"
+#include "cr190.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,6 +55,8 @@ int trigg_init(start_info_t *sinfo)
     srand2(stime, 0, 0);
     triggm.retry_num = 32;
 
+    triggm.chip_num = 1;
+
     if ((triggm.fd_dev = ser_open(triggm.file_dev, 115200)) < 0) {
         sloge(triggm.log, "open '%s' fail: %s\n", triggm.file_dev, strerror(errno));
     }
@@ -77,9 +80,9 @@ int trigg_init(start_info_t *sinfo)
 
 int trigg_gen_work(trigg_work_t *work, trigg_cand_t *cand)
 {
-    trigg_cand_copy(work->cand, cand);
+    trigg_cand_copy(&(work->cand), cand);
 
-    btrailer_t *bt = work->cand->cand_trailer;
+    btrailer_t *bt = work->cand.cand_trailer;
     trigg_solve(work);
     trigg_gen(bt->nonce);
     trigg_expand((uint8_t *)work->chain, bt->nonce);
@@ -91,7 +94,9 @@ int trigg_gen_work(trigg_work_t *work, trigg_cand_t *cand)
 int trigg_post_constant(int id, trigg_work_t *work)
 {
     work->base = 0x00000000;
-    //work->end = 0x0fffffff;
+    work->end  = 0x0fffffff;
+    slogd(CLOG, "Post id %02d constant, base 0x%08x, end 0x%08x\n", id, work->base, work->end);
+
     //work->target = 0;
     //work->midstate[] = 
     //work->ending_msg[] = 
@@ -102,8 +107,9 @@ int trigg_post_constant(int id, trigg_work_t *work)
 
 int trigg_start(trigg_cand_t *cand)
 {
-    // stop_all_chips();
-    
+    cr190_write(triggm.fd_dev, 0, 0x20, 0x00000100);
+    cr190_read(triggm.fd_dev, 0, 0x0c);
+   
     for (int i=0; i<triggm.chip_num; i++) {
         for (int j=0; j<CHIP_MAX_OUTSTANDING; j++) {
             trigg_gen_work(chip_info[i].work + j, cand);
@@ -301,7 +307,7 @@ void* thread_trigg_pool(void *arg)
             triggm.candidate.cand_data = (char *)realloc(triggm.candidate.cand_data, 1024);
             triggm.candidate.cand_len = 1024;
             triggm.candidate.cand_tm = monotime();
-            triggm.candidate.cand_trailer = (btrailer_t*)triggm.candidate.cand_data;
+            triggm.candidate.cand_trailer = (btrailer_t*)(triggm.candidate.cand_data + (triggm.candidate.cand_len - sizeof(btrailer_t)));
 
             static btrailer_t bt;
             FILE *fp = fopen("./candidate", "rb");
@@ -341,7 +347,7 @@ void* thread_trigg_pool(void *arg)
 
 void trigg_solve(trigg_work_t *work)
 {
-    btrailer_t *bt = work->cand->cand_trailer;
+    btrailer_t *bt = work->cand.cand_trailer;
 
     memset(work->chain + 32, 0, (256 + 16));
     memcpy(work->chain, bt->mroot, 32);
@@ -351,12 +357,9 @@ void trigg_solve(trigg_work_t *work)
     put16(bt->nonce + 2, rand16());
     put16(work->chain + (32 + 256), rand16());      // tchain's nonceH[16] (high nonce) for hardware calc
     put16(work->chain + (32 + 258), rand16());
-#ifdef DEBUG
-    int *p = (int*)bt->nonce;
-    slogd(CLOG, "tailer nonce low: 0x%08x\n", p[0]);
-    p = (int*)&(triggm.chain[32 + 256]);
-    slogd(CLOG, "tchain nonce high: 0x%08x\n", p[0]);
-#endif
+
+    slogd(CLOG, "Generate work, trailer nonceL 0x%08x, tchain nonceH 0x%08x\n", 
+                    *((int *)(bt->nonce)), *((int *)(&(work->chain[32 + 256]))));
 }
 
 int trigg_coreipl_copy(uint32_t *dst, uint32_t *src)
@@ -377,12 +380,13 @@ int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src)
         free(dst->cand_data);
     if ((dst->cand_data = (char *)malloc(src->cand_len)) == NULL) 
         return -1;
-    memcpy(dst->cand_data, src->cand_data, dst->cand_len);
+    memcpy(dst->cand_data, src->cand_data, src->cand_len);
     memcpy(dst->server_bnum, src->server_bnum, 8);
     dst->coreip_ix = src->coreip_ix;
-    dst->cand_trailer = src->cand_trailer;
     dst->cand_len = src->cand_len;
+    dst->cand_trailer = (btrailer_t *)(dst->cand_data + (dst->cand_len - sizeof(btrailer_t)));
     dst->cand_tm = src->cand_tm;
+
     return 0;
 }
 

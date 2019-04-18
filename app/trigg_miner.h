@@ -53,7 +53,7 @@ typedef struct {
 } trigg_miner_t;
 
 typedef struct {
-    trigg_cand_t    *cand;
+    trigg_cand_t    cand;
     tchain_t        chain;
 
     uint32_t        base;
