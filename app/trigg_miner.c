@@ -51,6 +51,7 @@ int trigg_init(start_info_t *sinfo)
 
     time_t stime;
     time(&stime);
+    stime = 0x12345678; // #################
     srand16(stime);
     srand2(stime, 0, 0);
     triggm.retry_num = 32;
@@ -104,15 +105,42 @@ bool is_golden_image(uint32_t ver)
 
 int trigg_post_constant(int id, trigg_work_t *work)
 {
+    char buf[84];
+
     work->base = 0x00000000;
-    work->end  = 0x0fffffff;
-    slogd(CLOG, "Post id %02d constant, base 0x%08x, end 0x%08x\n", id, work->base, work->end);
+    work->end  = 0x23c3ffff;
+    work->target  = 0x00000000;
+    slogd(CLOG, "Post id %03d constant, base=0x%08x, end=0x%08x, target=0x%08x\n", id, work->base, work->end, work->target);
 
-    //work->target = 0;
-    //work->midstate[] = 
-    //work->ending_msg[] = 
+    // midstate
+    SHA256_CTX ctx;
+    sha256_init(&ctx);
+    sha256_update(&ctx, (uint8_t *)work->chain, 256);
+    int *hp = (int *)ctx.state;
+    for (int i = 0; i < 8; i++) {
+        slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
+    }
+    // ending_msg
+    hp = (int *)(((char *)work->chain) + 256);
+    for (int i = 0; i < 8; i++) {
+        slogd(CLOG, "end_msg[%02d]: 0x%08x\n", i, hp[i]);
+    }
+    // first hash
+    byte hash[32];
+    sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
+    char *hstr= abin2hex(hash, 32);
+    slogd(CLOG, "First hash: %s\n", hstr);
+    free(hstr);
 
-    // write(id,addr,data);
+    // make constant
+    memcpy(buf, &work->base, 4);
+    memcpy(buf+4, &work->end, 4);
+    memcpy(buf+4+4, ctx.state, 32);
+    memcpy(buf+4+4+32, ((char *)work->chain) + 256, 32);
+    memcpy(buf+4+4+32+32, &work->target, 4);
+    memcpy(buf+4+4+32+32+4, work->cand.cand_trailer->bnum, 8);
+
+    cr190_write_l(triggm.fd_dev, id, 0x40, buf, 84);
     return 0;
 }
 
@@ -256,27 +284,6 @@ void* thread_trigg_miner(void *arg)
         //    trigg_expand((uint8_t *)triggm.chain, cand_mining.cand_trailer->nonce);
         //    trigg_gen((byte *)&triggm.chain[32 + 256]);
 
-        //    // first hash
-        //    byte hash[32];
-        //    sha256((byte *)triggm.chain, (32 + 256 + 16 + 8), hash);
-        //    char *hstr= abin2hex(hash, 32);
-        //    slogd(CLOG, "First hash: %s\n", hstr);
-        //    free(hstr);
-
-        //    // midstate
-        //    SHA256_CTX ctx;
-        //    sha256_init(&ctx);
-        //    sha256_update(&ctx, (uint8_t *)triggm.chain, 256);
-        //    int *hp = (int *)ctx.state;
-        //    for (int i = 0; i < 8; i++) {
-        //        slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
-        //    }
-
-        //    // end msg
-        //    hp = (int *)&triggm.chain[256];
-        //    for (int i = 0; i < 8; i++) {
-        //        slogd(CLOG, "end_msg[%02d]: 0x%08x\n", i, hp[i]);
-        //    }
 
         //    nsleep(3);
         //} else {
