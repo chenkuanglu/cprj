@@ -91,6 +91,17 @@ int trigg_gen_work(trigg_work_t *work, trigg_cand_t *cand)
     return 0;
 }
 
+#define IMG_VER_GOLDEN      0x10000000UL
+#define IMG_VER_ALGO_MASK   0x00ffffffUL
+
+bool is_golden_image(uint32_t ver)
+{
+    if ((ver & ~IMG_VER_ALGO_MASK) == IMG_VER_GOLDEN) {
+        return true;
+    }
+    return false;
+}
+
 int trigg_post_constant(int id, trigg_work_t *work)
 {
     work->base = 0x00000000;
@@ -105,34 +116,70 @@ int trigg_post_constant(int id, trigg_work_t *work)
     return 0;
 }
 
-int trigg_start(trigg_cand_t *cand)
+int trigg_start(void)
 {
-    cr190_write(triggm.fd_dev, 0, 0x20, 0x00000100);
-    cr190_read(triggm.fd_dev, 0, 0x0c);
-   
     for (int i=0; i<triggm.chip_num; i++) {
-        for (int j=0; j<CHIP_MAX_OUTSTANDING; j++) {
-            trigg_gen_work(chip_info[i].work + j, cand);
-            trigg_post_constant(i+1, chip_info[i].work + j);
-        }
-        chip_info[i].work_ix = 0;
+        cr190_write(triggm.fd_dev, i+1, 0x20, 0x00000100);
+        cr190_read(triggm.fd_dev, i+1, 0x24);
+        cr190_read(triggm.fd_dev, i+1, 0x0c);
     }
 
     return 0;
 }
 
-int trigg_upstream_proc(upstream_t *msg)
+int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 {
-    slogd(CLOG, "process id %03d addr 0x%02d data 0x%08x", msg->id, msg->addr, msg->data);
+    int i, id;
+    trigg_work_t *work;
+    slogd(CLOG, "UP MSG: %03d,0x%02x,0x%08x\n", msg->id, msg->addr, msg->data);
 
+    id = msg->id;
     switch (msg->addr) {
         case 0x0c:
+            chip_info[id-1].work_rdi = 0;
+            chip_info[id-1].work_wri = 0;
+            for (i=0; i<CHIP_MAX_OUTSTANDING; i++) {
+                if (is_golden_image(chip_info[id-1].version)) {
+                    continue;
+                }
+                work = &chip_info[id-1].work[i];
+                trigg_gen_work(work, cand);
+                trigg_post_constant(id, work);
+
+                chip_info[id-1].work_wri += 1;
+                if (chip_info[id-1].work_wri >= CHIP_MAX_OUTSTANDING) {
+                    chip_info[id-1].work_wri = 0;
+                }
+            }
+            //set 0x64 timeout
+            break;
+
+        case 0x24:
+            if (chip_info[id-1].version == 0) {
+                chip_info[id-1].version = msg->data;
+                slogd(CLOG, "Get chip %03d version 0x%08x\n", id, msg->data);
+            }
             break;
 
         case 0x64:
+            //check 1st hash
+            //set 0x68 timeout
             break;
 
         case 0x68:
+            work = &chip_info[id-1].work[chip_info[id-1].work_wri];
+            trigg_gen_work(work, cand);
+            trigg_post_constant(id, work);
+
+            chip_info[id-1].work_wri += 1;
+            if (chip_info[id-1].work_wri >= CHIP_MAX_OUTSTANDING) {
+                chip_info[id-1].work_wri = 0;
+            }
+
+            chip_info[id-1].work_rdi += 1;
+            if (chip_info[id-1].work_rdi >= CHIP_MAX_OUTSTANDING) {
+                chip_info[id-1].work_rdi = 0;
+            }
             break;
 
         case 0x69:
@@ -142,6 +189,9 @@ int trigg_upstream_proc(upstream_t *msg)
             break;
 
         default:
+            if (msg->addr >= 0x70 && msg->addr <= 0x7f) {
+                // check hash
+            }
             break;
     }
 
@@ -178,21 +228,18 @@ void* thread_trigg_miner(void *arg)
                 mux_lock(&triggm.cand_lock);
                 if (cand_mining.cand_tm < triggm.candidate.cand_tm) {
                     trigg_cand_copy(&cand_mining, &triggm.candidate);
-                    slog(triggm.log, CCL_CYAN "New block 0x%08x%08x received\n" CCL_END, 
-                            *((int32_t*)(cand_mining.cand_trailer->bnum+4)), *((int32_t*)(cand_mining.cand_trailer->bnum)));
+                    slog(triggm.log, CCL_CYAN "New block 0x%x received\n" CCL_END, *((int32_t*)(cand_mining.cand_trailer->bnum)));
                 }
                 mux_unlock(&triggm.cand_lock);
                 if (!triggm.started) {
                     triggm.started = 1;
-                    trigg_start(&cand_mining);
+                    trigg_start();
                 }
                 break;
             case TRIGG_CMD_UP_FRM:
-                slogw(CLOG, "TRIGG_CMD_UP_FRM...\n");
-                trigg_upstream_proc(upstream);
+                trigg_upstream_proc(&cand_mining, upstream);
                 break;
             case CORE_MSG_CMD_EXPIRE:
-                slogw(CLOG, "CORE_MSG_CMD_EXPIRE...\n");
                 break;
             default:
                 break;

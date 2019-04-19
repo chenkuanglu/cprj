@@ -12,7 +12,7 @@ void* thread_upstream(void *arg)
     char msg_buf[buf_size];
     
     core_msg_t *msg_header = (core_msg_t *)msg_buf;
-    upstream_t *upstream = (upstream_t *)(msg_buf + sizeof(core_msg_t));
+    upstream_t *upstream = (upstream_t *)(msg_header->data);
 
     if (triggm.fd_dev <= 0) {
         sloge(CLOG, "Invalid serial fd %d\n", triggm.fd_dev);
@@ -34,7 +34,7 @@ void* thread_upstream(void *arg)
         slogi(CLOG, "UP FRM: %03d,0x%02x,0x%08x\n", pack_buf.id, pack_buf.addr, pack_buf.data);
         
         // chip id check 
-        if ( (triggm.chip_num > 0) && (pack_buf.id > triggm.chip_num) ) {
+        if ( (triggm.chip_num > 0) && (pack_buf.id <= 0 || pack_buf.id > triggm.chip_num) ) {
             sloge(CLOG, "Invalid chip id %03d\n", pack_buf.id);
             continue;
         }

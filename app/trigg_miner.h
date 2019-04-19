@@ -63,14 +63,16 @@ typedef struct {
     char            *ending_msg;
 } trigg_work_t;
 
-#define CHIP_MAX_OUTSTANDING    2
+#define CHIP_MAX_OUTSTANDING    1
 
 typedef struct {
     trigg_work_t    work[CHIP_MAX_OUTSTANDING];
-    int             work_ix;
+    int             work_wri;
+    int             work_rdi;
     uint32_t        count_hit;
     uint32_t        count_err;
 
+    uint32_t        version;
     double          hashrate;
 } chip_info_t;
 
