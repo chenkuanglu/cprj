@@ -12,7 +12,7 @@
 #include <time.h>
 #include <pthread.h>
 #include <errno.h>
-#include <tgmath.h>
+#include <math.h>
 #include <sys/time.h>
 
 #ifdef __cplusplus

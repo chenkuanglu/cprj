@@ -21,7 +21,7 @@ typedef struct {
     pthread_t   tid_sig;        // sync signal query thread id
 
     pthread_t   tid_guard;
-    que_cb_t    que_guard;
+    tmr_cb_t    tmr_guard;
 } core_info_t;
 
 static core_info_t core_info;
@@ -79,9 +79,8 @@ int core_init(start_info_t *sinfo)
         return 0;
     }
 
-    if (que_init(&core_info.que_guard) != 0) 
+    if (tmr_init(&core_info.tmr_guard) != 0) 
         return -1;
-    que_set_mpool(&core_info.que_guard, 0, sizeof(thrq_cb_t *));
 
     if (pthread_create(&core_info.tid_guard, NULL, thread_guard, &core_info) != 0) {
         sloge(CLOG, "pthread_create() create thread_sig fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
@@ -126,36 +125,35 @@ void core_loop(void)
     }
 }
 
-int core_add_guard(thrq_cb_t *thrq)
+#define CORE_GUARD_PERIOD   TMR_TIME2TICK(1.0)
+#define CORE_GUARD_TMRID    0x100
+
+void core_guard_tmrcallback(void *arg)
 {
-    return que_insert_tail(&core_info.que_guard, &thrq, sizeof(thrq_cb_t *));
-}
-
-static void* thread_guard(void *arg)
-{
-    pthread_t tid = pthread_self();
-    pthread_detach(tid);
-
-    uint32_t count = 0;
-    que_cb_t *pq = &core_info.que_guard;
-    thrq_cb_t **qsend;
-
     core_msg_t cmsg;
     cmsg.type = CORE_MSG_TYPE_TIMER;
     cmsg.cmd = CORE_MSG_CMD_EXPIRE;
     cmsg.tm = monotime();
     cmsg.len = 0;
 
+    thrq_cb_t *qsend = (thrq_cb_t *)arg;
+    thrq_send(qsend, &cmsg, sizeof(cmsg));
+}
+
+int core_add_guard(thrq_cb_t *thrq)
+{
+    tmr_add(&core_info.tmr_guard, CORE_GUARD_TMRID, TMR_EVENT_TYPE_PERIODIC, CORE_GUARD_PERIOD, 
+            core_guard_tmrcallback, thrq);
+    return 0;
+}
+
+static void* thread_guard(void *arg)
+{
+    pthread_t tid = pthread_self();
+    pthread_detach(tid);
     for (;;) {
-        nsleep(0.1);
-        count++;
-        if (count % 10 == 0) {
-            que_elm_t *var;
-            QUE_FOREACH(var, pq) {
-                qsend = (thrq_cb_t **)var->data;
-                thrq_send(*qsend, &cmsg, sizeof(cmsg));
-            }    
-        }
+        nsleep(TMR_PERIOD);
+        tmr_heartbeat(&core_info.tmr_guard);
     }
 }
 

@@ -94,8 +94,8 @@ typedef struct {
 #define QUE_BLOCK_SIZE(data_size)       (sizeof(que_elm_t) + (data_size))
 
 /* lock/unlock queue, thread safe */
-#define que_lock(que)          mux_lock(&que->lock)
-#define que_unlock(que)        mux_unlock(&que->lock)
+#define QUE_LOCK(que)          mux_lock(&que->lock)
+#define QUE_UNLOCK(que)        mux_unlock(&que->lock)
 
 /* thread safe */
 extern int          que_init            (que_cb_t *que);

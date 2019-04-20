@@ -22,6 +22,7 @@
 #include "../lib/log.h"
 #include "../lib/thrq.h"
 #include "../lib/que.h"
+#include "../timer/timer.h"
 
 #ifdef __cplusplus
 extern "C" {

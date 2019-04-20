@@ -256,7 +256,7 @@ void* thread_trigg_miner(void *arg)
                 mux_lock(&triggm.cand_lock);
                 if (cand_mining.cand_tm < triggm.candidate.cand_tm) {
                     trigg_cand_copy(&cand_mining, &triggm.candidate);
-                    slog(triggm.log, CCL_CYAN "New block 0x%x received\n" CCL_END, *((int32_t*)(cand_mining.cand_trailer->bnum)));
+                    slogi(triggm.log, CCL_CYAN "New block 0x%x received\n" CCL_END, *((int32_t*)(cand_mining.cand_trailer->bnum)));
                 }
                 mux_unlock(&triggm.cand_lock);
                 if (!triggm.started) {
@@ -268,6 +268,7 @@ void* thread_trigg_miner(void *arg)
                 trigg_upstream_proc(&cand_mining, upstream);
                 break;
             case CORE_MSG_CMD_EXPIRE:
+                logw("CORE_MSG_CMD_EXPIRE...\n");
                 break;
             default:
                 break;
