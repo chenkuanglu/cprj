@@ -5,10 +5,15 @@
  **/
 
 #include "timer.h"
+#include "../lib/timetick.h"
+#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif 
+
+tmr_cb_t tmr_def;
+static pthread_t tid_tmr_def;
 
 int tmr_init(tmr_cb_t *tmr)
 {
@@ -16,7 +21,24 @@ int tmr_init(tmr_cb_t *tmr)
         return -1;
     if (que_init(&tmr->que) != 0) 
         return -1;
-    tmr->count = 0;
+    return 0;
+}
+
+// 100ms 
+static void* tmr_thread_def(void *arg)
+{
+    pthread_t tid = pthread_self();
+    pthread_detach(tid);
+    for (;;) {
+        nsleep(0.1);
+        tmr_heartbeat(&tmr_def);
+    }
+}
+
+int tmr_init_def(void)
+{
+    tmr_init(&tmr_def);
+    pthread_create(&tid_tmr_def, 0, tmr_thread_def, 0);
     return 0;
 }
 
@@ -31,7 +53,8 @@ int tmr_add(tmr_cb_t *tmr, int id, int type, int period, tmr_event_proc_t proc, 
     evt.ticks = period;
     evt.proc = proc;
     evt.arg = arg;
-    return que_insert_tail(&tmr->que, &evt, sizeof(evt));
+    int res = que_insert_tail(&tmr->que, &evt, sizeof(evt));
+    return res;
 }
 
 int tmr_remove(tmr_cb_t *tmr, int id)
@@ -48,7 +71,7 @@ int tmr_remove(tmr_cb_t *tmr, int id)
             break;
         }
     }    
-    QUE_LOCK(pq);
+    QUE_UNLOCK(pq);
     return 0;
 }
 
@@ -76,12 +99,11 @@ void tmr_heartbeat(tmr_cb_t *tmr)
             QUE_REMOVE(&tmr->que, var);
         }
     }    
-    QUE_LOCK(pq);
+    QUE_UNLOCK(pq);
 }
 
 void tmr_destroy(tmr_cb_t *tmr)
 {
-    tmr->que.count = 0;
     que_destroy(&tmr->que);
 }
 

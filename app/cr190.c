@@ -103,11 +103,11 @@ int cr190_read(int fd, uint8_t id, uint8_t reg)
     buffer[2] = 0x2a;
     buffer[3] = reg;
 
+    slogi(CLOG, "READ: %03d,0x%02x\n", id, reg);
+
     pthread_mutex_lock(&cr190_cmd_mutex);
     ser_send(fd, buffer, sizeof(buffer));
     pthread_mutex_unlock(&cr190_cmd_mutex);
-
-    slogd(CLOG, "read  id=%03d, reg=0x%02x\n", id, reg);
 
     return 0;
 }
@@ -122,11 +122,11 @@ int cr190_write(int fd, uint8_t id, uint8_t reg, uint32_t data)
     buffer[3] = reg;
     memcpy(&buffer[4], &data, 4);
 
+    slogi(CLOG, "WRITE: %03d,0x%02x,0x%08x\n", id, reg, data);
+
     pthread_mutex_lock(&cr190_cmd_mutex);
     ser_send(fd, buffer, sizeof(buffer));
     pthread_mutex_unlock(&cr190_cmd_mutex);
-
-    slogd(CLOG, "write id=%03d, reg=0x%02x, data=0x%08x\n", id, reg, data);
 
     return 0;
 }
@@ -145,12 +145,12 @@ int cr190_write_l(int fd, uint8_t id, uint8_t reg, char *data, int len)
     buffer[2] = 0x32;
     buffer[3] = reg;
 
+    slogi(CLOG, "WRITE %03d,0x%02x,[%dB]\n", id, reg, len);
+
     pthread_mutex_lock(&cr190_cmd_mutex);
     ser_send(fd, buffer, sizeof(buffer));
     ser_send(fd, data, len);
     pthread_mutex_unlock(&cr190_cmd_mutex);
-
-    slogd(CLOG, "write id=%03d, reg=0x%02x,  len=%d\n", id, reg, len);
 
     return 0;
 }

@@ -33,7 +33,6 @@ typedef struct {
 
 typedef struct {
     que_cb_t que;
-    int count;
 } tmr_cb_t;
 
 #define TMR_EVENT_TYPE_PERIODIC     0
@@ -41,6 +40,9 @@ typedef struct {
 
 #define TMR_PERIOD                  0.1
 #define TMR_TIME2TICK(tm)           ( ceil((tm)/TMR_PERIOD) )
+
+extern tmr_cb_t tmr_def;
+extern int tmr_init_def(void);
 
 extern int tmr_init(tmr_cb_t *tmr);
 extern int tmr_add(tmr_cb_t *tmr, int id, int type, int period, tmr_event_proc_t proc, void *arg);

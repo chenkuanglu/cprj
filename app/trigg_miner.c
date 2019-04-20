@@ -56,7 +56,7 @@ int trigg_init(start_info_t *sinfo)
     srand2(stime, 0, 0);
     triggm.retry_num = 32;
 
-    triggm.chip_num = 1;
+    triggm.chip_num = 2;
 
     if ((triggm.fd_dev = ser_open(triggm.file_dev, 115200)) < 0) {
         sloge(triggm.log, "open '%s' fail: %s\n", triggm.file_dev, strerror(errno));
@@ -110,27 +110,27 @@ int trigg_post_constant(int id, trigg_work_t *work)
     work->base = 0x00000000;
     work->end  = 0x23c3ffff;
     work->target  = 0x00000000;
-    slogd(CLOG, "Post id %03d constant, base=0x%08x, end=0x%08x, target=0x%08x\n", id, work->base, work->end, work->target);
+    slogx(CLOG, CCL_CYAN "CONST: %03d,[0x%08x,0x%08x],0x%08x\n" CCL_END, id, work->base, work->end, work->target);
 
     // midstate
     SHA256_CTX ctx;
     sha256_init(&ctx);
     sha256_update(&ctx, (uint8_t *)work->chain, 256);
-    int *hp = (int *)ctx.state;
-    for (int i = 0; i < 8; i++) {
-        slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
-    }
-    // ending_msg
-    hp = (int *)(((char *)work->chain) + 256);
-    for (int i = 0; i < 8; i++) {
-        slogd(CLOG, "end_msg[%02d]: 0x%08x\n", i, hp[i]);
-    }
-    // first hash
-    byte hash[32];
-    sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
-    char *hstr= abin2hex(hash, 32);
-    slogd(CLOG, "First hash: %s\n", hstr);
-    free(hstr);
+    //int *hp = (int *)ctx.state;
+    //for (int i = 0; i < 8; i++) {
+    //    slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
+    //}
+    //// ending_msg
+    //hp = (int *)(((char *)work->chain) + 256);
+    //for (int i = 0; i < 8; i++) {
+    //    slogd(CLOG, "end_msg[%02d]: 0x%08x\n", i, hp[i]);
+    //}
+    //// first hash
+    //byte hash[32];
+    //sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
+    //char *hstr= abin2hex(hash, 32);
+    //slogd(CLOG, "First hash: %s\n", hstr);
+    //free(hstr);
 
     // make constant
     memcpy(buf, &work->base, 4);
@@ -159,7 +159,6 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 {
     int i, id;
     trigg_work_t *work;
-    slogd(CLOG, "UP MSG: %03d,0x%02x,0x%08x\n", msg->id, msg->addr, msg->data);
 
     id = msg->id;
     switch (msg->addr) {
@@ -185,7 +184,6 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
         case 0x24:
             if (chip_info[id-1].version == 0) {
                 chip_info[id-1].version = msg->data;
-                slogd(CLOG, "Get chip %03d version 0x%08x\n", id, msg->data);
             }
             break;
 
@@ -268,7 +266,6 @@ void* thread_trigg_miner(void *arg)
                 trigg_upstream_proc(&cand_mining, upstream);
                 break;
             case CORE_MSG_CMD_EXPIRE:
-                logw("CORE_MSG_CMD_EXPIRE...\n");
                 break;
             default:
                 break;
@@ -326,7 +323,8 @@ void* thread_trigg_pool(void *arg)
         }
 
         // update nodes list every 1h
-        if (tm_nlst == 0 || monotime() - tm_nlst > 3600) {
+        //if (tm_nlst == 0 || monotime() - tm_nlst > 3600) {
+        if (0) {
             int retry = triggm.retry_num;
             while (trigg_download_lst() != 0) {
                 if (--retry <= 0)

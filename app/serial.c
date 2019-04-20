@@ -15,6 +15,8 @@
 #include <errno.h>  
 
 #include "serial.h"
+#include "../timer/timer.h"
+#include "../lib/timetick.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -29,6 +31,10 @@ int name_arr[] = {
     500000, 115200, 57600, 38400,  19200,  9600,  4800,  2400,  1200,  300,
 	38400,  19200,  9600, 4800, 2400, 1200,  300, 
 };
+
+#if SER_SIM_EN > 0
+ser_sim_t ser_sim;
+#endif 
 
 static int set_speed(int fd, int speed)
 {
@@ -74,53 +80,52 @@ static int set_parity(int fd, int databits, int stopbits, int parity)
     options.c_iflag &= ~(IXON | IXOFF | IXANY); 
 
     switch (databits) {
-  	case 7:
-  		options.c_cflag |= CS7;
-  		break;
-  	case 8:
-		options.c_cflag |= CS8;
-		break;
-	default:
-		return -1;
-	}
-	
+        case 7:
+            options.c_cflag |= CS7;
+            break;
+        case 8:
+            options.c_cflag |= CS8;
+            break;
+        default:
+            return -1;
+    }
+
     switch (parity) {
-  	case 'n':
-	case 'N':
-		options.c_cflag &= ~PARENB;     /* Clear parity enable */
-		options.c_iflag &= ~INPCK;      /* Enable parity checking */
-		break;
-	case 'o':
-	case 'O':
-		options.c_cflag |= (PARODD | PARENB);   /* odd */ 
-		options.c_iflag |= INPCK;               /* Disnable parity checking */
-		break;
-	case 'e':
-	case 'E':
-		options.c_cflag |= PARENB;      /* Enable parity */
-		options.c_cflag &= ~PARODD;       
-		options.c_iflag |= INPCK;       /* Disnable parity checking */
-		break;
-	case 'S':
-	case 's':                           /* as no parity*/
-		options.c_cflag &= ~PARENB;
-		options.c_cflag &= ~CSTOPB;
-		break;
-	default:
-		return -1;
-	}
+        case 'n':
+        case 'N':
+            options.c_cflag &= ~PARENB;     /* Clear parity enable */
+            options.c_iflag &= ~INPCK;      /* Enable parity checking */
+            break;
+        case 'o':
+        case 'O':
+            options.c_cflag |= (PARODD | PARENB);   /* odd */ 
+            options.c_iflag |= INPCK;               /* Disnable parity checking */
+            break;
+        case 'e':
+        case 'E':
+            options.c_cflag |= PARENB;      /* Enable parity */
+            options.c_cflag &= ~PARODD;       
+            options.c_iflag |= INPCK;       /* Disnable parity checking */
+            break;
+        case 'S':
+        case 's':                           /* as no parity*/
+            options.c_cflag &= ~PARENB;
+            options.c_cflag &= ~CSTOPB;
+            break;
+        default:
+            return -1;
+    }
  
-    switch (stopbits)
-  	{
-  	case 1:
-  		options.c_cflag &= ~CSTOPB;
-		break;
-	case 2:
-		options.c_cflag |= CSTOPB;
-		break;
-	default:
-		return -1;
-	}
+    switch (stopbits) {
+        case 1:
+            options.c_cflag &= ~CSTOPB;
+            break;
+        case 2:
+            options.c_cflag |= CSTOPB;
+            break;
+        default:
+            return -1;
+    }
 	
     /* Set input parity option */
     if (parity != 'n') {
@@ -130,16 +135,44 @@ static int set_parity(int fd, int databits, int stopbits, int parity)
     options.c_cc[VMIN] = 0;
 
     tcflush(fd,TCIFLUSH);           /* Update the options and do it NOW */
-    if (tcsetattr(fd,TCSANOW,&options) != 0)
-  	{
+    if (tcsetattr(fd,TCSANOW,&options) != 0) {
 		return (-1);
 	}
 	
     return 0;
 }
  
+#if SER_SIM_EN > 0
+static void ser_sim_callback(void *arg)
+{
+    mux_lock(&ser_sim.lock);
+    ser_sim.upstream[5] = 0x68;
+    *((uint32_t *)ser_sim.upstream) = ser_sim.nonce_done;
+    ser_sim.upstream[4] = *((uint8_t *)arg);
+    ser_sim.up_count = 6;
+    mux_unlock(&ser_sim.lock);
+}
+#endif 
+
 int ser_open(const char* device, int speed)
 {
+#if SER_SIM_EN > 0
+    memset(&ser_sim, 0, sizeof(ser_sim));
+    for (int i=0; i<256; i++) {
+        ser_sim.id_tbl[i] = i;
+    }
+    mux_init(&ser_sim.lock);
+    strcpy(ser_sim.dev, device);
+    ser_sim.baud = speed;
+    ser_sim.const_len = SER_SIM_CONST_LEN;
+    ser_sim.first_hash = 0x11223344;
+    ser_sim.nonce_done = 0x23c3ffff;
+    ser_sim.version = 0x2800000d;
+    ser_sim.hit_delay = 3.0;
+    ser_sim.done_delay = 6.0;
+    tmr_init_def();
+    return 1;
+#else 
 	int fd = open(device, O_RDWR | O_NOCTTY);
 	if (fd > 0) {
     	if (set_parity(fd, 8, 1, 'N') < 0) {
@@ -149,8 +182,8 @@ int ser_open(const char* device, int speed)
 	} else {
 		return -1;
 	}
-
 	return fd;
+#endif
 }
 
 int ser_close(int fd)
@@ -160,15 +193,65 @@ int ser_close(int fd)
 
 int ser_send(int fd, const void *data, int len)
 {
+#if SER_SIM_EN > 0
+    uint8_t *pdata = (uint8_t *)data;
+    int id = pdata[1];
+    int addr = pdata[3];
+    while (ser_sim.up_count != 0)
+        nsleep(0.1);
+
+    mux_lock(&ser_sim.lock);
+    switch (addr) {
+        case 0x40:
+            ser_sim.upstream[5] = 0x64;
+            *((uint32_t *)ser_sim.upstream) = ser_sim.first_hash;
+            break;
+        case 0x24:
+            ser_sim.upstream[5] = addr;
+            *((uint32_t *)ser_sim.upstream) = ser_sim.version;
+            break;
+        case 0x0c:
+            ser_sim.upstream[5] = addr;
+            *((uint32_t *)ser_sim.upstream) = 0;
+            break;
+        default:
+            mux_unlock(&ser_sim.lock);
+            return len;
+            break;
+    }
+    ser_sim.upstream[4] = id;
+    ser_sim.up_count = 6;
+    if (addr == 0x40) {
+        tmr_add(&tmr_def, -1, TMR_EVENT_TYPE_ONESHOT, ser_sim.done_delay/0.1, ser_sim_callback, &ser_sim.id_tbl[id]);
+    }
+    mux_unlock(&ser_sim.lock);
+    return len;
+#else
 	if (len > 0) {
         return write(fd, data, len);
 	}
     return -1;
+#endif
 }
 
 int ser_receive(int fd, uint8_t *str_dat, int n)
 {
+#if SER_SIM_EN > 0
+    mux_lock(&ser_sim.lock);
+    if (ser_sim.up_count == 6) {
+        memcpy(str_dat, ser_sim.upstream, ser_sim.up_count);
+    }
+    if (ser_sim.up_count) {
+        ser_sim.up_count -= 1;
+        mux_unlock(&ser_sim.lock);
+        return 1;
+    }
+    mux_unlock(&ser_sim.lock);
+    nsleep(0.1);
+    return 0;
+#else
     return read(fd, str_dat, n);
+#endif
 }
 
 
