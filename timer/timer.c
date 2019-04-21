@@ -64,7 +64,7 @@ int tmr_remove(tmr_cb_t *tmr, int id)
     tmr_event_t *pe;
 
     QUE_LOCK(pq);
-    QUE_FOREACH(var, pq) {
+    QUE_FOREACH_REVERSE(var, pq) {
         pe = (tmr_event_t *)var->data;
         if (pe->id == id) {
             QUE_REMOVE(&tmr->que, var);
@@ -85,7 +85,7 @@ void tmr_heartbeat(tmr_cb_t *tmr)
     tmr_event_t *pe;
 
     QUE_LOCK(pq);
-    QUE_FOREACH(var, pq) {
+    QUE_FOREACH_REVERSE(var, pq) {
         pe = (tmr_event_t *)var->data;
         if (pe->ticks > 0) {
             pe->ticks -= 1;

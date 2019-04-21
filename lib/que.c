@@ -206,7 +206,6 @@ int que_insert_tail(que_cb_t *que, void *data, int len)
         mux_unlock(&que->lock);
         errno = EAGAIN;
         return -1;
-        return -1;
     }
 
     memcpy(elm->data, data, len);
@@ -365,7 +364,7 @@ int que_concat(que_cb_t *que1, que_cb_t *que2)
 que_elm_t* QUE_FIND(que_cb_t *que, void *data, int len, que_cmp_data_t pfn_cmp)
 {
     que_elm_t *var;
-    QUE_FOREACH(var, que) {
+    QUE_FOREACH_REVERSE(var, que) {
         if (pfn_cmp(var->data, data, fmin(len, var->len)) == 0) {
             return var;
         }

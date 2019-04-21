@@ -56,7 +56,7 @@ int trigg_init(start_info_t *sinfo)
     srand2(stime, 0, 0);
     triggm.retry_num = 32;
 
-    triggm.chip_num = 2;
+    triggm.chip_num = 1;
 
     if ((triggm.fd_dev = ser_open(triggm.file_dev, 115200)) < 0) {
         sloge(triggm.log, "open '%s' fail: %s\n", triggm.file_dev, strerror(errno));
@@ -116,31 +116,35 @@ int trigg_post_constant(int id, trigg_work_t *work)
     SHA256_CTX ctx;
     sha256_init(&ctx);
     sha256_update(&ctx, (uint8_t *)work->chain, 256);
-    //int *hp = (int *)ctx.state;
-    //for (int i = 0; i < 8; i++) {
-    //    slogd(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
-    //}
+    int *hp = (int *)ctx.state;
+    for (int i = 0; i < 8; i++) {
+        slogw(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
+    }
+    slogw(CLOG, "\n");
     //// ending_msg
     //hp = (int *)(((char *)work->chain) + 256);
     //for (int i = 0; i < 8; i++) {
-    //    slogd(CLOG, "end_msg[%02d]: 0x%08x\n", i, hp[i]);
+    //    slogw(CLOG, "end_msg[%02d]:  0x%08x\n", i, hp[i]);
     //}
-    //// first hash
-    //byte hash[32];
-    //sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
-    //char *hstr= abin2hex(hash, 32);
-    //slogd(CLOG, "First hash: %s\n", hstr);
-    //free(hstr);
+    //slogw(CLOG, "\n");
+    // first hash
+    byte hash[32];
+    sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
+    char *hstr= abin2hex(hash, 32);
+    slogw(CLOG, "First hash: %s\n", hstr);
+    free(hstr);
 
     // make constant
-    memcpy(buf, &work->base, 4);
-    memcpy(buf+4, &work->end, 4);
-    memcpy(buf+4+4, ctx.state, 32);
-    memcpy(buf+4+4+32, ((char *)work->chain) + 256, 32);
-    memcpy(buf+4+4+32+32, &work->target, 4);
-    memcpy(buf+4+4+32+32+4, work->cand.cand_trailer->bnum, 8);
+    int len = 84;
+    memcpy(buf, &len, 4);
+    memcpy(buf+4, &work->base, 4);
+    memcpy(buf+4+4, &work->end, 4);
+    memcpy(buf+4+4+4, ctx.state, 32);
+    memcpy(buf+4+4+4+32, ((char *)work->chain) + 256, 32);
+    memcpy(buf+4+4+4+32+32, &work->target, 4);
+    memcpy(buf+4+4+4+32+32+4, work->cand.cand_trailer->bnum, 8);
 
-    cr190_write_l(triggm.fd_dev, id, 0x40, buf, 84);
+    cr190_write_l(triggm.fd_dev, id, 0x40, buf, len+4);
     return 0;
 }
 
@@ -159,6 +163,7 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 {
     int i, id;
     trigg_work_t *work;
+    byte hash[32];
 
     id = msg->id;
     switch (msg->addr) {
@@ -216,7 +221,16 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 
         default:
             if (msg->addr >= 0x70 && msg->addr <= 0x7f) {
-                // check hash
+                i = chip_info[id-1].work_rdi;
+                work = &chip_info[id-1].work[i];
+
+                //((uint32_t*)work->chain)[0] = msg->data;
+                //trigg_gen((byte *)&work->chain[32 + 256]);
+
+                sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
+                char *hstr= abin2hex(hash, 32);
+                slogw(CLOG, "Check hash: %s\n", hstr);
+                free(hstr);
             }
             break;
     }

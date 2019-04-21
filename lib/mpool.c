@@ -108,11 +108,11 @@ int mpool_destroy(mpool_t *mpool)
         return -1;
     if (mpool->mode == MPOOL_MODE_DGROWN) {
         mpool_elm_t *p;
-        TAILQ_FOREACH(p, &mpool->hdr_free, entry) {
+        TAILQ_FOREACH_REVERSE(p, &mpool->hdr_free, __mpool_head, entry) {
             TAILQ_REMOVE(&mpool->hdr_free, p, entry);
             free(p);
         }
-        TAILQ_FOREACH(p, &mpool->hdr_used, entry) {
+        TAILQ_FOREACH_REVERSE(p, &mpool->hdr_used, __mpool_head, entry) {
             TAILQ_REMOVE(&mpool->hdr_used, p, entry);
             free(p);
         }

@@ -143,8 +143,33 @@ static int set_parity(int fd, int databits, int stopbits, int parity)
 }
  
 #if SER_SIM_EN > 0
-static void ser_sim_callback(void *arg)
+static void ser_sim_callback_70(void *arg)
 {
+    mux_lock(&ser_sim.lock);
+    while (ser_sim.up_count != 0) {
+        mux_unlock(&ser_sim.lock);
+        nsleep(0.1);
+        mux_lock(&ser_sim.lock);
+    }
+    mux_unlock(&ser_sim.lock);
+
+    mux_lock(&ser_sim.lock);
+    ser_sim.upstream[5] = 0x70;
+    *((uint32_t *)ser_sim.upstream) = ser_sim.nonce_hit;
+    ser_sim.upstream[4] = *((uint8_t *)arg);
+    ser_sim.up_count = 6;
+    mux_unlock(&ser_sim.lock);
+}
+static void ser_sim_callback_68(void *arg)
+{
+    mux_lock(&ser_sim.lock);
+    while (ser_sim.up_count != 0) {
+        mux_unlock(&ser_sim.lock);
+        nsleep(0.1);
+        mux_lock(&ser_sim.lock);
+    }
+    mux_unlock(&ser_sim.lock);
+
     mux_lock(&ser_sim.lock);
     ser_sim.upstream[5] = 0x68;
     *((uint32_t *)ser_sim.upstream) = ser_sim.nonce_done;
@@ -167,9 +192,10 @@ int ser_open(const char* device, int speed)
     ser_sim.const_len = SER_SIM_CONST_LEN;
     ser_sim.first_hash = 0x11223344;
     ser_sim.nonce_done = 0x23c3ffff;
+    ser_sim.nonce_hit = 0x00000000;
     ser_sim.version = 0x2800000d;
-    ser_sim.hit_delay = 3.0;
-    ser_sim.done_delay = 6.0;
+    ser_sim.hit_delay = 2.0;
+    ser_sim.done_delay = 3.0;
     tmr_init_def();
     return 1;
 #else 
@@ -194,17 +220,29 @@ int ser_close(int fd)
 int ser_send(int fd, const void *data, int len)
 {
 #if SER_SIM_EN > 0
+    static int wr_0x40 = 0;
     uint8_t *pdata = (uint8_t *)data;
     int id = pdata[1];
     int addr = pdata[3];
-    while (ser_sim.up_count != 0)
-        nsleep(0.1);
+    
+    if (wr_0x40) {
+        wr_0x40 = 0;
+        return len;
+    }
 
     mux_lock(&ser_sim.lock);
+    while (ser_sim.up_count != 0) {
+        mux_unlock(&ser_sim.lock);
+        nsleep(0.1);
+        mux_lock(&ser_sim.lock);
+    }
+    mux_unlock(&ser_sim.lock);
+
     switch (addr) {
         case 0x40:
             ser_sim.upstream[5] = 0x64;
             *((uint32_t *)ser_sim.upstream) = ser_sim.first_hash;
+            wr_0x40 = 1;
             break;
         case 0x24:
             ser_sim.upstream[5] = addr;
@@ -221,8 +259,11 @@ int ser_send(int fd, const void *data, int len)
     }
     ser_sim.upstream[4] = id;
     ser_sim.up_count = 6;
+    static int queid = -1;
+
     if (addr == 0x40) {
-        tmr_add(&tmr_def, -1, TMR_EVENT_TYPE_ONESHOT, ser_sim.done_delay/0.1, ser_sim_callback, &ser_sim.id_tbl[id]);
+        tmr_add(&tmr_def, queid--, TMR_EVENT_TYPE_ONESHOT, ser_sim.hit_delay/0.1, ser_sim_callback_70, &ser_sim.id_tbl[id]);
+        tmr_add(&tmr_def, queid--, TMR_EVENT_TYPE_ONESHOT, ser_sim.done_delay/0.1, ser_sim_callback_68, &ser_sim.id_tbl[id]);
     }
     mux_unlock(&ser_sim.lock);
     return len;
