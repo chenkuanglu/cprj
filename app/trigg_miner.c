@@ -170,6 +170,7 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
     int i, id;
     trigg_work_t *work;
     byte hash[32];
+    double tdiff;
 
     id = msg->id;
     switch (msg->addr) {
@@ -220,8 +221,9 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
                 chip_info[id-1].work_rdi = 0;
             }
 
-            chip_info[id-1].hashrate = (msg->data / (monotime() - chip_info[id-1].last_hashstart))/1e6;
-            slogw(CLOG, "Calc hashrate: %.4f MH/s\n", chip_info[id-1].hashrate);
+            tdiff = (monotime() - chip_info[id-1].last_hashstart);
+            chip_info[id-1].hashrate = (msg->data / tdiff)/1e6;
+            slogi(CLOG, "id %03d done 0x%08x, %.3fs, %.2fMH/s\n", id, msg->data, tdiff, chip_info[id-1].hashrate);
             trigg_set_msgtimout(id, 0x64);
             break;
 
