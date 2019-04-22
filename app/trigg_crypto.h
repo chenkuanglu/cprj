@@ -422,6 +422,7 @@ extern byte *trigg_gen(byte *in);
 extern char *trigg_expand(byte *chain, byte *in);
 extern char *trigg_generate(byte *chain, byte *nonce, int diff);
 extern long long trigg_diff_val(byte d);
+extern int trigg_eval(byte *h, byte d);
 
 #ifdef __cplusplus
 }

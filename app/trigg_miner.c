@@ -110,7 +110,7 @@ int trigg_post_constant(int id, trigg_work_t *work)
 
     work->base = 0x00000001;
     work->end  = 0x23c3ffff;
-    work->target  = 0x00000000;
+    work->target  = 0x0000ffff;
     slogx(CLOG, CCL_CYAN "CONST: %03d,[0x%08x,0x%08x],0x%08x\n" CCL_END, id, work->base, work->end, work->target);
 
     // midstate
@@ -223,14 +223,31 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
             if (msg->addr >= 0x70 && msg->addr <= 0x7f) {
                 i = chip_info[id-1].work_rdi;
                 work = &chip_info[id-1].work[i];
+                uint32_t *pnonce = (uint32_t *)(&work->chain[32 + 256]);
+                int diff = work->cand.cand_trailer->difficulty[0];
 
-                //((uint32_t*)work->chain)[0] = msg->data;
-                //trigg_gen((byte *)&work->chain[32 + 256]);
-
+                *pnonce = msg->data;
+                trigg_gen_seed((byte *)pnonce);
                 sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
+
+                // #####################   ???
+                int *pint = (int *)hash;
+                for (int j=0; j<8/2; j++) {
+                    int tmp = pint[j];
+                    pint[j] = pint[7-j];
+                    pint[7-j] = tmp;
+                }
+                // #####################
+
                 char *hstr= abin2hex(hash, 32);
-                slogw(CLOG, "Check hash: %s\n", hstr);
+                slogw(CLOG, "Hit 0x%08x, check hash: %s\n", *pnonce, hstr);
                 free(hstr);
+
+                if (trigg_eval(hash, diff) != NIL) {
+                    slogx(CLOG, CCL_CYAN "chip %03d: bingo nonce.\n" CCL_END, msg->id);
+                } else {
+                    sloge(CLOG, "chip %03d: hash error!\n", msg->id);
+                }
             }
             break;
     }
