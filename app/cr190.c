@@ -138,14 +138,20 @@ int cr190_write_l(int fd, uint8_t id, uint8_t reg, char *data, int len)
     if (data == NULL || len <= 0)
         return -1;
 
-    uint8_t buffer[4] = {0};
+    uint8_t buffer[8] = {0};
+    int cmd_len = 4;
 
     buffer[0] = 0;
     buffer[1] = id;
     buffer[2] = 0x32;
     buffer[3] = reg;
 
-    slogi(CLOG, "WRITE %03d,0x%02x,[%dB]\n", id, reg, len-4);
+    if (reg == 0x40) {
+        cmd_len += 4;
+        memswap(buffer+4, &len, 4, 4);
+    }
+
+    slogi(CLOG, "WRITE %03d,0x%02x,[%dB]\n", id, reg, len);
 
     slogd(CLOG, "serial data[%02d]: 0x%08x\n", 0, *(((int *)buffer)));
     for (int i=0; i<len/4; i++) {
@@ -153,7 +159,7 @@ int cr190_write_l(int fd, uint8_t id, uint8_t reg, char *data, int len)
     }
 
     pthread_mutex_lock(&cr190_cmd_mutex);
-    ser_send(fd, buffer, sizeof(buffer));
+    ser_send(fd, buffer, cmd_len);
     ser_send(fd, data, len);
     pthread_mutex_unlock(&cr190_cmd_mutex);
 

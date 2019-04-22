@@ -105,7 +105,7 @@ bool is_golden_image(uint32_t ver)
 
 int trigg_post_constant(int id, trigg_work_t *work)
 {
-    char buf[84];
+    char buf[184] = {0};
 
     work->base = 0x00000000;
     work->end  = 0x23c3ffff;
@@ -135,16 +135,15 @@ int trigg_post_constant(int id, trigg_work_t *work)
     free(hstr);
 
     // make constant
-    int len = 84;
-    memcpy(buf, &len, 4);
-    memcpy(buf+4, &work->base, 4);
-    memcpy(buf+4+4, &work->end, 4);
-    memcpy(buf+4+4+4, ctx.state, 32);
-    memcpy(buf+4+4+4+32, ((char *)work->chain) + 256, 32);
-    memcpy(buf+4+4+4+32+32, &work->target, 4);
-    memcpy(buf+4+4+4+32+32+4, work->cand.cand_trailer->bnum, 8);
+    int len = 184;
+    memcpy(buf, &work->base, 4);
+    memcpy(buf+4, &work->end, 4);
+    memcpy(buf+4+4, ctx.state, 32);
+    memcpy(buf+4+4+32, ((char *)work->chain) + 256, 32);
+    memcpy(buf+4+4+32+32, &work->target, 4);
+    memcpy(buf+4+4+32+32+4, work->cand.cand_trailer->bnum, 8);
 
-    cr190_write_l(triggm.fd_dev, id, 0x40, buf, len+4);
+    cr190_write_l(triggm.fd_dev, id, 0x40, buf, len);
     return 0;
 }
 
