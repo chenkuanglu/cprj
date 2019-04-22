@@ -417,6 +417,7 @@ static FE Frame[][MAXH] = {
 
 #define TRIGG_CHECK Trigg_check;
 
+extern byte *trigg_gen_seed(byte *in);
 extern byte *trigg_gen(byte *in);
 extern char *trigg_expand(byte *chain, byte *in);
 extern char *trigg_generate(byte *chain, byte *nonce, int diff);

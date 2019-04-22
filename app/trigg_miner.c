@@ -87,7 +87,8 @@ int trigg_gen_work(trigg_work_t *work, trigg_cand_t *cand)
     trigg_solve(work);
     trigg_gen(bt->nonce);
     trigg_expand((uint8_t *)work->chain, bt->nonce);
-    trigg_gen((byte *)&work->chain[32 + 256]);
+    //trigg_gen((byte *)&work->chain[32 + 256]);
+    trigg_gen_seed((byte *)&work->chain[32 + 256]);
 
     return 0;
 }
@@ -107,7 +108,7 @@ int trigg_post_constant(int id, trigg_work_t *work)
 {
     char buf[184] = {0};
 
-    work->base = 0x00000000;
+    work->base = 0x00000001;
     work->end  = 0x23c3ffff;
     work->target  = 0x00000000;
     slogx(CLOG, CCL_CYAN "CONST: %03d,[0x%08x,0x%08x],0x%08x\n" CCL_END, id, work->base, work->end, work->target);
@@ -116,11 +117,11 @@ int trigg_post_constant(int id, trigg_work_t *work)
     SHA256_CTX ctx;
     sha256_init(&ctx);
     sha256_update(&ctx, (uint8_t *)work->chain, 256);
-    int *hp = (int *)ctx.state;
-    for (int i = 0; i < 8; i++) {
-        slogw(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
-    }
-    slogw(CLOG, "\n");
+    //int *hp = (int *)ctx.state;
+    //for (int i = 0; i < 8; i++) {
+    //    slogw(CLOG, "midstate[%02d]: 0x%08x\n", i, hp[i]);
+    //}
+    //slogw(CLOG, "\n");
     //// ending_msg
     //hp = (int *)(((char *)work->chain) + 256);
     //for (int i = 0; i < 8; i++) {
@@ -421,8 +422,10 @@ void trigg_solve(trigg_work_t *work)
 
     put16(bt->nonce + 0, rand16());                 // tainler's nonceL[16] (low nonce) as xnonce
     put16(bt->nonce + 2, rand16());
-    put16(work->chain + (32 + 256), rand16());      // tchain's nonceH[16] (high nonce) for hardware calc
-    put16(work->chain + (32 + 258), rand16());
+    //put16(work->chain + (32 + 256), rand16());      // tchain's nonceH[16] (high nonce) for hardware calc
+    //put16(work->chain + (32 + 258), rand16());
+    put16(work->chain + (32 + 256), 0x0001);      // tchain's nonceH[16] (high nonce) for hardware calc
+    put16(work->chain + (32 + 258), 0x0000);
 
     slogd(CLOG, "Generate work, trailer nonceL 0x%08x, tchain nonceH 0x%08x\n", 
                     *((int *)(bt->nonce)), *((int *)(&(work->chain[32 + 256]))));
