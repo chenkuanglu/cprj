@@ -65,6 +65,8 @@ typedef struct {
 
 #define CHIP_MAX_OUTSTANDING    1
 
+#define CHIP_MSG_TIMEOUT        6.0
+
 typedef struct {
     trigg_work_t    work[CHIP_MAX_OUTSTANDING];
     int             work_wri;
@@ -74,6 +76,11 @@ typedef struct {
 
     uint32_t        version;
     double          hashrate;
+
+    int             msgid_guard;
+    double          tout_guard;
+
+    double          last_hashstart;
 } chip_info_t;
 
 extern trigg_miner_t triggm;

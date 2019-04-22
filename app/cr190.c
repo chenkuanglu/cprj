@@ -153,11 +153,11 @@ int cr190_write_l(int fd, uint8_t id, uint8_t reg, char *data, int len)
 
     slogi(CLOG, "WRITE %03d,0x%02x,[%dB]\n", id, reg, len);
 
-    slogd(CLOG, "serial data[%02d]: 0x%08x\n", 0, *(((int *)buffer)));
-    slogd(CLOG, "serial data[%02d]: 0x%08x\n", 1, *(((int *)(buffer+4))));
-    for (int i=0; i<len/4; i++) {
-        slogd(CLOG, "serial data[%02d]: 0x%08x\n", i+2, *(((int *)data) + i));
-    }
+    //slogd(CLOG, "serial data[%02d]: 0x%08x\n", 0, *(((int *)buffer)));
+    //slogd(CLOG, "serial data[%02d]: 0x%08x\n", 1, *(((int *)(buffer+4))));
+    //for (int i=0; i<len/4; i++) {
+    //    slogd(CLOG, "serial data[%02d]: 0x%08x\n", i+2, *(((int *)data) + i));
+    //}
 
     pthread_mutex_lock(&cr190_cmd_mutex);
     ser_send(fd, buffer, cmd_len);

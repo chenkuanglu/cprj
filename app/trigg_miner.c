@@ -110,7 +110,7 @@ int trigg_post_constant(int id, trigg_work_t *work)
 
     work->base = 0x00000001;
     work->end  = 0x23c3ffff;
-    work->target  = 0x0000ffff;
+    work->target  = 0x0001ffff;
     slogx(CLOG, CCL_CYAN "CONST: %03d,[0x%08x,0x%08x],0x%08x\n" CCL_END, id, work->base, work->end, work->target);
 
     // midstate
@@ -159,6 +159,12 @@ int trigg_start(void)
     return 0;
 }
 
+void trigg_set_msgtimout(int id, int msgid)
+{
+    chip_info[id-1].msgid_guard = msgid;
+    chip_info[id-1].tout_guard = monotime() + CHIP_MSG_TIMEOUT;
+}
+
 int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 {
     int i, id;
@@ -183,7 +189,7 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
                     chip_info[id-1].work_wri = 0;
                 }
             }
-            //set 0x64 timeout
+            trigg_set_msgtimout(id, 0x64);
             break;
 
         case 0x24:
@@ -193,8 +199,10 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
             break;
 
         case 0x64:
-            //check 1st hash
-            //set 0x68 timeout
+            if (chip_info[id-1].hashrate > 0) {
+                trigg_set_msgtimout(id, 0x68);
+            }
+            chip_info[id-1].last_hashstart = monotime();
             break;
 
         case 0x68:
@@ -211,6 +219,10 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
             if (chip_info[id-1].work_rdi >= CHIP_MAX_OUTSTANDING) {
                 chip_info[id-1].work_rdi = 0;
             }
+
+            chip_info[id-1].hashrate = (msg->data / (monotime() - chip_info[id-1].last_hashstart))/1e6;
+            slogw(CLOG, "Calc hashrate: %.4f MH/s\n", chip_info[id-1].hashrate);
+            trigg_set_msgtimout(id, 0x64);
             break;
 
         case 0x69:
@@ -297,6 +309,14 @@ void* thread_trigg_miner(void *arg)
                 trigg_upstream_proc(&cand_mining, upstream);
                 break;
             case CORE_MSG_CMD_EXPIRE:
+                for (int j=0; j<triggm.chip_num; j++) {
+                    if (chip_info[j].msgid_guard) {
+                        if (chip_info[j].tout_guard < monotime()) {
+                            sloge(CLOG, "exit, chip %03d 0x%02x timeout\n", j+1, chip_info[j].msgid_guard);
+                            core_proper_exit(0);
+                        }
+                    }
+                }
                 break;
             default:
                 break;
