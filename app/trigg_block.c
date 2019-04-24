@@ -282,17 +282,18 @@ int blocking(SOCKET sd)
     return ioctl(sd, FIONBIO, (u_long FAR *) &arg);
 }
 
-int send_cand_data(NODE *np, char *data)
+int send_cand_data(NODE *np, char *data, int len)
 {
     TX *tx;
-    int n, status;
-
+    int n = TRANLEN, status;
     tx = &np->tx;
 
     blocking(np->sd);
     for (;;) {
-        memcpy(TRANBUFF(tx), data, TRANLEN);
-        n = TRANLEN;
+        if (n > len)
+            n = len;
+        memcpy(TRANBUFF(tx), data, n);
+        len -= n;
         put16(tx->len, n);
         status = send_op(np, OP_SEND_BL);
         if (n < TRANLEN) {
@@ -314,8 +315,8 @@ int send_mblock(trigg_cand_t *cand)
         return VERROR;
     put16(node.tx.len, 1);
     send_op(&node, OP_MBLOCK);
-
-    status = send_cand_data(&node, cand->cand_data);
+    status = send_cand_data(&node, cand->cand_data, cand->cand_len);
+    slogd(CLOG, "send core ip[%d] ok, total size %d bytes\n", cand->coreip_ix, cand->cand_len);
 
     close(node.sd);
     return status;

@@ -21,7 +21,7 @@ extern "C" {
 #define SOCKET                  unsigned int   /* Borland 32-bit */
 #define INVALID_SOCKET          (SOCKET)(~0)
 
-#define PVERSION    2
+#define PVERSION    3
 
 #define VEOK        0      /* No error                    */
 #define VERROR      1      /* General error               */

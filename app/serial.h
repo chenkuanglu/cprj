@@ -15,7 +15,7 @@ extern "C"{
 #define SER_PORT_DEFAULT        "/dev/ttyAMA0"
 #define SER_BAUDRATE_DEFAULT    115200
 
-#define SER_SIM_EN              1
+#define SER_SIM_EN              0
 #define SER_SIM_CONST_LEN       84
 
 typedef struct {

@@ -298,6 +298,7 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
                 } else {
                     if (trigg_eval(hash, 32) == NIL) {  // diff_32 = 0x00000000
                         sloge(CLOG, "id %03d 0x%08x hash error\n", msg->id, msg->data);
+                    trigg_submit(work); //#########################
                     }
                 }
             }
@@ -331,14 +332,16 @@ int trigg_submit(trigg_work_t *work)
     memset(work->cand.coreip_submit, 0, CORELISTLEN);
     for (int j=0; j<CORELISTLEN; j++) {
         pthread_testcancel();
+        if (work->cand.coreip_submit[work->cand.coreip_ix]) 
+            break;
         send_mblock(&work->cand);
         work->cand.coreip_submit[work->cand.coreip_ix] = 1;
+        slogd(CLOG, "core ip %d set flag\n", work->cand.coreip_ix);
 
         (work->cand.coreip_ix)++;
         if (work->cand.coreip_ix >= CORELISTLEN) 
             work->cand.coreip_ix = 0;
-        if (work->cand.coreip_submit[work->cand.coreip_ix]) 
-            break;
+        slogd(CLOG, "core ip read flag=%d\n", work->cand.coreip_submit[work->cand.coreip_ix]);
     }
 
     return 0;
@@ -420,7 +423,7 @@ void* thread_trigg_miner(void *arg)
 
 void* thread_trigg_pool(void *arg)
 {
-#define TRAILER_DEBUG
+//#define TRAILER_DEBUG
     char ebuf[128];
     char msg_buf[TRIGG_MAX_MSG_BUF];
     const double QUE_TIMEOUT = 1.0;     // 1s
@@ -451,8 +454,11 @@ void* thread_trigg_pool(void *arg)
         }
 
         // update nodes list every 1h
-        //if (tm_nlst == 0 || monotime() - tm_nlst > 3600) {
+#ifndef TRAILER_DEBUG
+        if (tm_nlst == 0 || monotime() - tm_nlst > 3600) {
+#else
         if (0) {
+#endif
             int retry = triggm.retry_num;
             while (trigg_download_lst() != 0) {
                 if (--retry <= 0)
