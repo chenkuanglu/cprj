@@ -138,8 +138,12 @@ int callserver(NODE *np, trigg_cand_t *cand, double timeout)
         ip = cand->coreip_lst[cand->coreip_ix];
         if (ip == 0 || ip == (uint32_t)0x0100007f)    // 0 & 127.0.0.1
             continue;
-        if ((np->sd = connectip(ip, timeout)) != INVALID_SOCKET)
+        if ((np->sd = connectip(ip, timeout)) != INVALID_SOCKET) {
             break;      // connect ip ok
+        } else {
+            slogw(CLOG, "clear core ip[%02d]\n", cand->coreip_ix);
+            cand->coreip_lst[cand->coreip_ix] = 0;
+        }
     }
     if(np->sd == INVALID_SOCKET) 
         return VERROR;  // no ip connect ok
@@ -153,6 +157,10 @@ int callserver(NODE *np, trigg_cand_t *cand, double timeout)
 bad:
         close(np->sd);
         np->sd = INVALID_SOCKET;
+
+        slogw(CLOG, "clear core ip[%02d]\n", cand->coreip_ix);
+        cand->coreip_lst[cand->coreip_ix] = 0;
+
         (cand->coreip_ix)++;    // switch to next coreip
         return VERROR;
     }
@@ -254,6 +262,10 @@ retry:
     send_op(&node, OP_GET_CBLOCK);
     if (get_block3(&node, cand, timeout) != 0) {    // 'cand->cand_data' may be destroyed
         close(node.sd);
+
+        slogw(CLOG, "clear core ip[%02d]\n", cand->coreip_ix);
+        cand->coreip_lst[cand->coreip_ix] = 0;
+
         (cand->coreip_ix)++;    // switch to next coreip
         if (--retry > 0) {
             slogw(CLOG, "Get candidate fail, retry...\n");

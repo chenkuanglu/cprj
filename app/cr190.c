@@ -148,7 +148,8 @@ int cr190_write_l(int fd, uint8_t id, uint8_t reg, char *data, int len)
 
     if (reg == 0x40) {
         cmd_len += 4;
-        memswap(buffer+4, &len, 4, 4);
+        //memswap(buffer+4, &len, 4, 4);
+        memcpy(buffer+4, &len, 4);
     }
 
     slogi(CLOG, "WRITE %03d,0x%02x,[%dB]\n", id, reg, len);

@@ -298,7 +298,7 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
                 } else {
                     if (trigg_eval(hash, 32) == NIL) {  // diff_32 = 0x00000000
                         sloge(CLOG, "id %03d 0x%08x hash error\n", msg->id, msg->data);
-                    trigg_submit(work); //#########################
+                        trigg_submit(work);     // ###############
                     }
                 }
             }
@@ -334,7 +334,11 @@ int trigg_submit(trigg_work_t *work)
         pthread_testcancel();
         if (work->cand.coreip_submit[work->cand.coreip_ix]) 
             break;
-        send_mblock(&work->cand);
+        int ret = send_mblock(&work->cand);
+        if (ret == VEOK) {   // only once ok???
+            slogi(CLOG, CCL_GREEN "core ip[%d] sumit OK\n" CCL_END, work->cand.coreip_ix);
+            break;
+        }
         work->cand.coreip_submit[work->cand.coreip_ix] = 1;
         slogd(CLOG, "core ip %d set flag\n", work->cand.coreip_ix);
 
