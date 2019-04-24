@@ -28,6 +28,7 @@ typedef struct {
     log_cb_t        *log;
 
     nodes_lst_t     nodes_lst;
+    char            wallet[TXADDRLEN];
 
     trigg_cand_t    candidate;
     mux_t           cand_lock;

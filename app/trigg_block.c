@@ -276,6 +276,51 @@ retry:
     return VEOK;
 }
 
+int blocking(SOCKET sd)
+{
+    u_long arg = 0L;
+    return ioctl(sd, FIONBIO, (u_long FAR *) &arg);
+}
+
+int send_cand_data(NODE *np, char *data)
+{
+    TX *tx;
+    int n, status;
+
+    tx = &np->tx;
+
+    blocking(np->sd);
+    for (;;) {
+        memcpy(TRANBUFF(tx), data, TRANLEN);
+        n = TRANLEN;
+        put16(tx->len, n);
+        status = send_op(np, OP_SEND_BL);
+        if (n < TRANLEN) {
+            return status;
+        }
+        if (status != VEOK) 
+            break;
+    }
+    return VERROR;
+}
+
+int send_mblock(trigg_cand_t *cand)
+{
+    NODE node;
+    int status;
+    const double timeout = 10.0;     // 10s timeout
+
+    if (callserver(&node, cand, timeout) != VEOK)
+        return VERROR;
+    put16(node.tx.len, 1);
+    send_op(&node, OP_MBLOCK);
+
+    status = send_cand_data(&node, cand->cand_data);
+
+    close(node.sd);
+    return status;
+}
+
 #ifdef __cplusplus
 }
 #endif 

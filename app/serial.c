@@ -190,9 +190,9 @@ int ser_open(const char* device, int speed)
     strcpy(ser_sim.dev, device);
     ser_sim.baud = speed;
     ser_sim.const_len = SER_SIM_CONST_LEN;
-    ser_sim.first_hash = 0x11223344;
+    ser_sim.first_hash = 0x92b3c90e;
     ser_sim.nonce_done = 0x23c3ffff;
-    ser_sim.nonce_hit = 0x00000000;
+    ser_sim.nonce_hit = 0x03636ef9;
     ser_sim.version = 0x2800000d;
     ser_sim.hit_delay = 2.0;
     ser_sim.done_delay = 3.0;

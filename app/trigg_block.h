@@ -110,6 +110,7 @@ typedef struct {
 typedef struct {
     uint32_t    coreip_lst[CORELISTLEN];
     int         coreip_ix;
+    int         coreip_submit[CORELISTLEN];
 
     char        server_bnum[8];     // callserver()
 
@@ -135,6 +136,7 @@ extern int trigg_get_cblock(trigg_cand_t *cand, int retry);
 extern int callserver(NODE *np, trigg_cand_t *cand, double timeout);
 extern int rx2(NODE *np, int checkids, double sec);
 extern SOCKET connectip(uint32_t ip, double tout);
+extern int send_mblock(trigg_cand_t *cand);
 
 #ifdef __cplusplus
 }

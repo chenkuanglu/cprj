@@ -30,6 +30,9 @@ void* thread_trigg_pool(void *arg);
 int trigg_coreipl_copy(uint32_t *dst, uint32_t *src);
 int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src);
 void trigg_solve(trigg_work_t *work);
+int trigg_load_wallet(char *wallet, const char *addrfile);
+int trigg_patch_wallet(trigg_work_t *work, char *wallet);
+int trigg_submit(trigg_work_t *work);
 
 int trigg_init(start_info_t *sinfo)
 {
@@ -61,6 +64,8 @@ int trigg_init(start_info_t *sinfo)
     if ((triggm.fd_dev = ser_open(triggm.file_dev, 115200)) < 0) {
         sloge(triggm.log, "open '%s' fail: %s\n", triggm.file_dev, strerror(errno));
     }
+
+    trigg_load_wallet(triggm.wallet, "maddr.dat");
 
     if (pthread_create(&triggm.thr_miner, NULL, thread_trigg_miner, &triggm) != 0) {
         sloge(triggm.log, "create 'thread_trigg_miner' fail: %s\n", strerror(errno));
@@ -132,7 +137,7 @@ int trigg_post_constant(int id, trigg_work_t *work)
     byte hash[32];
     sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
     char *hstr= abin2hex(hash, 32);
-    slogw(CLOG, "First hash: %s\n", hstr);
+    slogd(CLOG, "1st 0x%08x, hash %s\n", work->base, hstr);
     free(hstr);
 
     // make constant
@@ -156,6 +161,36 @@ int trigg_start(void)
         cr190_read(triggm.fd_dev, i+1, 0x0c);
     }
 
+    return 0;
+}
+
+int trigg_load_wallet(char *wallet, const char *addrfile)
+{
+    if (wallet == NULL || addrfile == NULL) {
+        return -1;
+    }
+    FILE *fp = fopen(addrfile, "rb");
+    if (fp == NULL) {
+        sloge(CLOG, "open file '%s' fail\n", addrfile);
+        return -1;
+    }
+    if (fread(wallet, 1, TXADDRLEN, fp) != TXADDRLEN) {
+        sloge(CLOG, "read file '%s' fail\n", addrfile);
+        fclose(fp);
+        return -1;
+    }
+    char *str = abin2hex(wallet, 32);
+    slogx(CLOG, CCL_CYAN "wallet: 0x%s\n" CCL_END, str);
+    free(str);
+
+    fclose(fp);
+    return 0;
+}
+
+int trigg_patch_wallet(trigg_work_t *work, char *wallet)
+{
+    char *data = (char *)(work->cand.cand_data);
+    memcpy(data+4, wallet, TXADDRLEN);
     return 0;
 }
 
@@ -254,15 +289,55 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
                 // #####################
 
                 char *hstr= abin2hex(hash, 32);
-                slogw(CLOG, "Hit 0x%08x, check hash: %s\n", *pnonce, hstr);
+                slogi(CLOG, "id %03d hit 0x%08x, %s\n", msg->id, msg->data, hstr);
                 free(hstr);
 
                 if (trigg_eval(hash, diff) != NIL) {
-                    slogx(CLOG, CCL_CYAN "chip %03d: bingo nonce.\n" CCL_END, msg->id);
+                    slogx(CLOG, CCL_CYAN "id %03d 0x%08x bingo nonce\n" CCL_END, msg->id, msg->data);
+                    trigg_submit(work);
                 } else {
-                    sloge(CLOG, "chip %03d: hash error!\n", msg->id);
+                    if (trigg_eval(hash, 32) == NIL) {  // diff_32 = 0x00000000
+                        sloge(CLOG, "id %03d 0x%08x hash error\n", msg->id, msg->data);
+                    }
                 }
             }
+            break;
+    }
+
+    return 0;
+}
+
+int trigg_submit(trigg_work_t *work)
+{
+    trigg_patch_wallet(work, triggm.wallet);
+    btrailer_t *bt = work->cand.cand_trailer;
+    put32(bt->stime, time(NULL));       // UTC ???
+    int hlen = work->cand.cand_len - (HASHLEN + 4 + HASHLEN);
+    int block_len = 16384;
+    int hash_offset = 0;
+
+    SHA256_CTX bctx;
+    sha256_init(&bctx);
+    do {
+        if (hlen - hash_offset < 16384) {
+            block_len = hlen - hash_offset;
+        }
+        sha256_update(&bctx, (byte *)work->cand.cand_data + hash_offset, block_len);
+        hash_offset += block_len;
+    } while (hlen - hash_offset > 0);
+    sha256_update(&bctx, (byte *)work->cand.cand_trailer->nonce, HASHLEN + 4);
+    sha256_final(&bctx, work->cand.cand_trailer->bhash);
+
+    memset(work->cand.coreip_submit, 0, CORELISTLEN);
+    for (int j=0; j<CORELISTLEN; j++) {
+        pthread_testcancel();
+        send_mblock(&work->cand);
+        work->cand.coreip_submit[work->cand.coreip_ix] = 1;
+
+        (work->cand.coreip_ix)++;
+        if (work->cand.coreip_ix >= CORELISTLEN) 
+            work->cand.coreip_ix = 0;
+        if (work->cand.coreip_submit[work->cand.coreip_ix]) 
             break;
     }
 
@@ -410,8 +485,8 @@ void* thread_trigg_pool(void *arg)
             mux_unlock(&triggm.cand_lock);
 #else
             tm_cand = monotime();
-            triggm.candidate.cand_data = (char *)realloc(triggm.candidate.cand_data, 1024);
-            triggm.candidate.cand_len = 1024;
+            triggm.candidate.cand_data = (char *)realloc(triggm.candidate.cand_data, 1024*20);
+            triggm.candidate.cand_len = 1024*20;
             triggm.candidate.cand_tm = monotime();
             triggm.candidate.cand_trailer = (btrailer_t*)(triggm.candidate.cand_data + (triggm.candidate.cand_len - sizeof(btrailer_t)));
 
