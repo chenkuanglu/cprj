@@ -258,7 +258,7 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 
             tdiff = (monotime() - chip_info[id-1].last_hashstart);
             chip_info[id-1].hashrate = (msg->data / tdiff)/1e6;
-            slogi(CLOG, "id %03d done 0x%08x, %.3fs, %.2fMH/s\n", id, msg->data, tdiff, chip_info[id-1].hashrate);
+            slogn(CLOG, "id %03d done 0x%08x, %.3fs, %.2fMH/s\n", id, msg->data, tdiff, chip_info[id-1].hashrate);
             trigg_set_msgtimout(id, 0x64);
             break;
 
@@ -298,7 +298,6 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
                 } else {
                     if (trigg_eval(hash, 32) == NIL) {  // diff_32 = 0x00000000
                         sloge(CLOG, "id %03d 0x%08x hash error\n", msg->id, msg->data);
-                        trigg_submit(work);     // ###############
                     }
                 }
             }
@@ -329,23 +328,16 @@ int trigg_submit(trigg_work_t *work)
     sha256_update(&bctx, (byte *)work->cand.cand_trailer->nonce, HASHLEN + 4);
     sha256_final(&bctx, work->cand.cand_trailer->bhash);
 
-    memset(work->cand.coreip_submit, 0, CORELISTLEN);
     for (int j=0; j<CORELISTLEN; j++) {
         pthread_testcancel();
-        if (work->cand.coreip_submit[work->cand.coreip_ix]) 
-            break;
         int ret = send_mblock(&work->cand);
-        if (ret == VEOK) {   // only once ok???
+        if (ret == VEOK) {
             slogi(CLOG, CCL_GREEN "core ip[%d] sumit OK\n" CCL_END, work->cand.coreip_ix);
-            break;
+            break;  // only once ?
         }
-        work->cand.coreip_submit[work->cand.coreip_ix] = 1;
-        slogd(CLOG, "core ip %d set flag\n", work->cand.coreip_ix);
-
         (work->cand.coreip_ix)++;
         if (work->cand.coreip_ix >= CORELISTLEN) 
             work->cand.coreip_ix = 0;
-        slogd(CLOG, "core ip read flag=%d\n", work->cand.coreip_submit[work->cand.coreip_ix]);
     }
 
     return 0;

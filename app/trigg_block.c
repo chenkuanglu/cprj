@@ -131,43 +131,34 @@ int callserver(NODE *np, trigg_cand_t *cand, double timeout)
     memset(np, 0, sizeof(NODE));
     np->sd = INVALID_SOCKET;
 
-    for (int j=0; j<CORELISTLEN; j++,(cand->coreip_ix)++) {
-        pthread_testcancel();
-        if (cand->coreip_ix >= CORELISTLEN) 
-            cand->coreip_ix = 0;
-        ip = cand->coreip_lst[cand->coreip_ix];
-        if (ip == 0 || ip == (uint32_t)0x0100007f)    // 0 & 127.0.0.1
-            continue;
-        if ((np->sd = connectip(ip, timeout)) != INVALID_SOCKET) {
-            break;      // connect ip ok
-        } else {
-            slogw(CLOG, "clear core ip[%02d]\n", cand->coreip_ix);
-            cand->coreip_lst[cand->coreip_ix] = 0;
-        }
+    ip = cand->coreip_lst[cand->coreip_ix];
+    if (ip == 0 || ip == (uint32_t)0x0100007f)    // 0 & 127.0.0.1
+        return VERROR;
+    if ((np->sd = connectip(ip, timeout)) == INVALID_SOCKET) {
+        slogw(CLOG, "ignore core ip[%02d]\n", cand->coreip_ix);
+        cand->coreip_lst[cand->coreip_ix] = 0;
+        return VERROR;
     }
-    if(np->sd == INVALID_SOCKET) 
-        return VERROR;  // no ip connect ok
 
     np->src_ip = ip;
     np->id1 = rand16();
     send_op(np, OP_HELLO);
     int ecode = rx2(np, 0, timeout);
     if(ecode != VEOK) {
-        sloge(CLOG, "Missing HELLO_ACK packet (%d)\n", ecode);
+        sloge(CLOG, "missing HELLO_ACK packet (%d)\n", ecode);
+        slogw(CLOG, "ignore core ip[%02d]\n", cand->coreip_ix);
+        cand->coreip_lst[cand->coreip_ix] = 0;
 bad:
         close(np->sd);
         np->sd = INVALID_SOCKET;
-
-        slogw(CLOG, "clear core ip[%02d]\n", cand->coreip_ix);
-        cand->coreip_lst[cand->coreip_ix] = 0;
-
-        (cand->coreip_ix)++;    // switch to next coreip
         return VERROR;
     }
     np->id2 = get16(np->tx.id2);
     np->opcode = get16(np->tx.opcode);
     if(np->opcode != OP_HELLO_ACK) {
         sloge(CLOG, "HELLO_ACK is wrong: %d\n", np->opcode);
+        slogw(CLOG, "ignore core ip[%02d]\n", cand->coreip_ix);
+        cand->coreip_lst[cand->coreip_ix] = 0;
         goto bad;
     }
     put64(cand->server_bnum, np->tx.cblock);  // copy blocknum
@@ -239,53 +230,51 @@ int trigg_get_cblock(trigg_cand_t *cand, int retry)
     slogd(CLOG, "\n");
     slogd(CLOG, "Start getting new candidate...\n");
 
-retry:
-    if (callserver(&node, cand, timeout) != VEOK)
-        return VERROR;
+    for (int j=0; j<CORELISTLEN; j++) {
+        if (callserver(&node, cand, timeout) != VEOK) {
+            (cand->coreip_ix)++;    // switch to next coreip
+            if (cand->coreip_ix >= CORELISTLEN)
+                cand->coreip_ix = 0;
+            continue;
+        }
 
-    slogd(CLOG, "Get server bnum: 0x%s\n", bnum2hex(cand->server_bnum));
-    if (cmp64(cand->server_bnum, last_bnum) < 0) {      // cur_sbnum < last_sbnum ?
-        slogw(CLOG, "This server doesn't have the latest block. switch a different server.\n");
-        close(node.sd);
-        (cand->coreip_ix)++;    // switch to next coreip
-        if (--retry > 0) {
-            slogw(CLOG, "Server bnum invalid, retry...\n");
-            goto retry;
-        } else {
-            return VERROR;
+        slogd(CLOG, "get server block num: 0x%s\n", bnum2hex(cand->server_bnum));
+        if (cmp64(cand->server_bnum, last_bnum) < 0) {      // cur_sbnum < last_sbnum ?
+            slogw(CLOG, "this server doesn't have the latest block, switch a different server.\n");
+            close(node.sd);
+            (cand->coreip_ix)++;    // switch to next coreip
+            if (cand->coreip_ix >= CORELISTLEN)
+                cand->coreip_ix = 0;
+            continue;
         }
         memcpy(last_bnum, cand->server_bnum, 8);
-    }
 
-    put16(node.tx.len, 1);
-    slogd(CLOG, "Attempting to download candidate block from network...\n");
-    send_op(&node, OP_GET_CBLOCK);
-    if (get_block3(&node, cand, timeout) != 0) {    // 'cand->cand_data' may be destroyed
+        put16(node.tx.len, 1);
+        slogi(CLOG, "attempting to download candidate block from core ip[%02d]...\n", cand->coreip_ix);
+        send_op(&node, OP_GET_CBLOCK);
+        if (get_block3(&node, cand, timeout) != 0) {    // 'cand->cand_data' may be destroyed
+            close(node.sd);
+
+            slogw(CLOG, "ignore core ip[%02d]\n", cand->coreip_ix);
+            cand->coreip_lst[cand->coreip_ix] = 0;
+
+            (cand->coreip_ix)++;    // switch to next coreip
+            if (cand->coreip_ix >= CORELISTLEN)
+                cand->coreip_ix = 0;
+            continue;
+        }
         close(node.sd);
 
-        slogw(CLOG, "clear core ip[%02d]\n", cand->coreip_ix);
-        cand->coreip_lst[cand->coreip_ix] = 0;
-
-        (cand->coreip_ix)++;    // switch to next coreip
-        if (--retry > 0) {
-            slogw(CLOG, "Get candidate fail, retry...\n");
-            goto retry;
-        } else {
-            return VERROR;
+        if (cmp64(cand->server_bnum, cand->cand_trailer->bnum) >= 0) {  // sbnum >= tbnum ?
+            // donot switch coreip, try again...
+            slogw(CLOG, "trailer block num invalid, retry...\n");
+            continue;
         }
-    }
-    close(node.sd);
-
-    if (cmp64(cand->server_bnum, cand->cand_trailer->bnum) >= 0) {  // sbnum >= tbnum ?
-        if (--retry > 0) {
-            slogw(CLOG, "Trailer bnum invalid, retry...\n");
-            goto retry;
-        } else {
-            return VERROR;
-        }
+    
+        return VEOK;
     }
 
-    return VEOK;
+    return VERROR;
 }
 
 int blocking(SOCKET sd)
@@ -328,7 +317,9 @@ int send_mblock(trigg_cand_t *cand)
     put16(node.tx.len, 1);
     send_op(&node, OP_MBLOCK);
     status = send_cand_data(&node, cand->cand_data, cand->cand_len);
-    slogd(CLOG, "send core ip[%d] ok, total size %d bytes\n", cand->coreip_ix, cand->cand_len);
+    if (status == VEOK) {
+        slogd(CLOG, "send core ip[%d] ok, total size %d bytes\n", cand->coreip_ix, cand->cand_len);
+    }
 
     close(node.sd);
     return status;

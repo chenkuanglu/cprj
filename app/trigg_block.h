@@ -110,7 +110,6 @@ typedef struct {
 typedef struct {
     uint32_t    coreip_lst[CORELISTLEN];
     int         coreip_ix;
-    int         coreip_submit[CORELISTLEN];
 
     char        server_bnum[8];     // callserver()
 
