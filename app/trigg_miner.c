@@ -279,14 +279,14 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
                 trigg_gen_seed((byte *)pnonce);
                 sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
 
-                // #####################   ???
-                int *pint = (int *)hash;
-                for (int j=0; j<8/2; j++) {
-                    int tmp = pint[j];
-                    pint[j] = pint[7-j];
-                    pint[7-j] = tmp;
-                }
-                // #####################
+                //// #####################   ???
+                //int *pint = (int *)hash;
+                //for (int j=0; j<8/2; j++) {
+                //    int tmp = pint[j];
+                //    pint[j] = pint[7-j];
+                //    pint[7-j] = tmp;
+                //}
+                //// #####################
 
                 char *hstr= abin2hex(hash, 32);
                 slogi(CLOG, "id %03d hit 0x%08x, %s\n", msg->id, msg->data, hstr);
@@ -311,7 +311,11 @@ int trigg_submit(trigg_work_t *work)
 {
     trigg_patch_wallet(work, triggm.wallet);
     btrailer_t *bt = work->cand.cand_trailer;
-    put32(bt->stime, time(NULL));       // UTC ???
+#ifdef TRAILER_DEBUG
+    put32(bt->stime, 0x12345678);       // UTC time
+#else
+    put32(bt->stime, time(NULL) - 8*3600);       // UTC time
+#endif
     int hlen = work->cand.cand_len - (HASHLEN + 4 + HASHLEN);
     int block_len = 16384;
     int hash_offset = 0;
@@ -397,23 +401,6 @@ void* thread_trigg_miner(void *arg)
             default:
                 break;
         }
-
-        //if (cand_mining.cand_trailer) {
-        //    slogd(CLOG, "\n");
-        //    long long tgt = trigg_diff_val(cand_mining.cand_trailer->difficulty[0]);
-        //    slogd(CLOG, "diff = %d, target = 0x%016llx\n", cand_mining.cand_trailer->difficulty[0], tgt);
-
-        //    // gen one work
-        //    trigg_solve(cand_mining.cand_trailer, cand_mining.cand_trailer->difficulty[0], cand_mining.cand_trailer->bnum);
-        //    trigg_gen(cand_mining.cand_trailer->nonce);
-        //    trigg_expand((uint8_t *)triggm.chain, cand_mining.cand_trailer->nonce);
-        //    trigg_gen((byte *)&triggm.chain[32 + 256]);
-
-
-        //    nsleep(3);
-        //} else {
-        //    continue;
-        //}
     }
 }
 
@@ -487,23 +474,23 @@ void* thread_trigg_pool(void *arg)
             mux_unlock(&triggm.cand_lock);
 #else
             tm_cand = monotime();
-            triggm.candidate.cand_data = (char *)realloc(triggm.candidate.cand_data, 1024*20);
-            triggm.candidate.cand_len = 1024*20;
+            triggm.candidate.cand_data = (char *)realloc(triggm.candidate.cand_data, 20028);
+            triggm.candidate.cand_len = 20028;
             triggm.candidate.cand_tm = monotime();
             triggm.candidate.cand_trailer = (btrailer_t*)(triggm.candidate.cand_data + (triggm.candidate.cand_len - sizeof(btrailer_t)));
 
-            static btrailer_t bt;
+            //static btrailer_t bt;
             FILE *fp = fopen("./candidate", "rb");
             if (fp == NULL) {
                 sloge(CLOG, "Open file ./candidate fail\n");
             } else {
-                fseek(fp, -(sizeof(btrailer_t)), SEEK_END);
-                fread(&bt, 1, sizeof(btrailer_t), fp);
+                fseek(fp, 0, SEEK_SET);
+                int num = fread(triggm.candidate.cand_data, 1, 20028, fp);
+                slogd(CLOG, "read %d bytes from file\n", num);
             }
             fclose(fp);
 
             mux_lock(&triggm.cand_lock);
-            memcpy(triggm.candidate.cand_trailer, &bt, sizeof(btrailer_t));
             triggm.candidate.cand_trailer->difficulty[0] = 15;  // set diff
             mux_unlock(&triggm.cand_lock);
 
