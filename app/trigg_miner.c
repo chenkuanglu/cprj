@@ -277,6 +277,7 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 
                 *pnonce = msg->data;
                 trigg_gen_seed((byte *)pnonce);
+                memcpy(work->cand.cand_trailer->nonce + 16, pnonce, 16);
                 sha256((byte *)work->chain, (32 + 256 + 16 + 8), hash);
 
                 //// #####################   ???
@@ -288,10 +289,11 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
                 //}
                 //// #####################
 
-                char *hstr= abin2hex(hash, 32);
+                char *hstr = abin2hex(hash, 32);
                 slogi(CLOG, "id %03d hit 0x%08x, %s\n", msg->id, msg->data, hstr);
                 free(hstr);
 
+                slogd(CLOG, "diff_32 = %016llx, diff_%d = 0x%016llx\n", trigg_diff_val(32), diff, trigg_diff_val(diff));
                 if (trigg_eval(hash, diff) != NIL) {
                     slogx(CLOG, CCL_CYAN "id %03d 0x%08x bingo nonce\n" CCL_END, msg->id, msg->data);
                     trigg_submit(work);
