@@ -36,6 +36,9 @@ typedef struct {
     tchain_t        chain;
     int             diff;
 
+    pthread_t       thr_submit;
+    thrq_cb_t       thrq_submit;
+
     pthread_t       thr_miner;
     thrq_cb_t       thrq_miner;
 

@@ -45,6 +45,8 @@ int trigg_init(start_info_t *sinfo)
     triggm.file_dev = sinfo->argv[2];
     triggm.nodes_lst.filename = strdup("startnodes.lst");
 
+    thrq_init(&triggm.thrq_submit);
+    thrq_set_mpool(&triggm.thrq_submit, 0, 1024);
     thrq_init(&triggm.thrq_miner);
     thrq_set_mpool(&triggm.thrq_miner, 0, 128);
     thrq_init(&triggm.thrq_pool);
@@ -311,6 +313,8 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 
 int trigg_submit(trigg_work_t *work)
 {
+    trigg_cand_t cand_submit;
+
     trigg_patch_wallet(work, triggm.wallet);
     btrailer_t *bt = work->cand.cand_trailer;
 #ifdef TRAILER_DEBUG
@@ -334,19 +338,60 @@ int trigg_submit(trigg_work_t *work)
     sha256_update(&bctx, (byte *)work->cand.cand_trailer->nonce, HASHLEN + 4);
     sha256_final(&bctx, work->cand.cand_trailer->bhash);
 
-    for (int j=0; j<CORELISTLEN; j++) {
-        pthread_testcancel();
-        int ret = send_mblock(&work->cand);
-        if (ret == VEOK) {
-            slogi(CLOG, CCL_GREEN "core ip[%d] sumit OK\n" CCL_END, work->cand.coreip_ix);
-            break;  // only once ?
-        }
-        (work->cand.coreip_ix)++;
-        if (work->cand.coreip_ix >= CORELISTLEN) 
-            work->cand.coreip_ix = 0;
-    }
+    // push submit data
+    memset(&cand_submit, 0, sizeof(trigg_cand_t));
+    trigg_cand_copy(&cand_submit, &work->cand);         // free cand_submit in thread submit
+    thrq_send(&triggm.thrq_submit, &cand_submit, sizeof(cand_submit));
+
+    //for (int j=0; j<CORELISTLEN; j++) {
+    //    pthread_testcancel();
+    //    int ret = send_mblock(&work->cand);
+    //    if (ret == VEOK) {
+    //        slogi(CLOG, CCL_GREEN "core ip[%d] submit OK\n" CCL_END, work->cand.coreip_ix);
+    //        break;  // only once ?
+    //    }
+    //    (work->cand.coreip_ix)++;
+    //    if (work->cand.coreip_ix >= CORELISTLEN) 
+    //        work->cand.coreip_ix = 0;
+    //}
+
+    memset(&cand_submit, 0, sizeof(trigg_cand_t));
 
     return 0;
+}
+
+void* thread_trigg_submit(void *arg)
+{
+    char ebuf[128];
+    const int buf_size = sizeof(core_msg_t) + sizeof(trigg_cand_t);
+    trigg_cand_t msg_buf[buf_size];
+    core_msg_t *pmsg = (core_msg_t *)msg_buf;
+    trigg_cand_t *cand = (trigg_cand_t *)(pmsg->data);
+
+    for (;;) {
+        pmsg->cmd = TRIGG_CMD_NOTHING;
+        if (thrq_receive(&triggm.thrq_submit, msg_buf, buf_size, 0) < 0) {
+            if (errno != ETIMEDOUT) {
+                sloge(CLOG, "thrq_receive() from triggm.thrq_pool fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
+                nsleep(0.1);
+                continue;
+            }
+        }
+
+        sloge(CLOG, "receive work, block num %08x\n", *((int *)(cand->cand_trailer->bnum)));
+        for (int j=0; j<CORELISTLEN; j++) {
+            pthread_testcancel();
+            int ret = send_mblock(cand);
+            if (ret == VEOK) {
+                slogi(CLOG, CCL_GREEN "core ip[%d] submit OK\n" CCL_END, cand->coreip_ix);
+                break;  // only once ?
+            }
+            (cand->coreip_ix)++;
+            if (cand->coreip_ix >= CORELISTLEN) 
+                cand->coreip_ix = 0;
+            free(cand->cand_data);
+        }
+    }
 }
 
 void* thread_trigg_miner(void *arg)
