@@ -66,7 +66,7 @@ typedef struct {
 
 #define CHIP_MAX_OUTSTANDING    1
 
-#define CHIP_MSG_TIMEOUT        6.0
+#define CHIP_MSG_TIMEOUT        10.0
 
 typedef struct {
     trigg_work_t    work[CHIP_MAX_OUTSTANDING];

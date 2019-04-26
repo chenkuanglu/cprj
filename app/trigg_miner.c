@@ -115,7 +115,7 @@ int trigg_post_constant(int id, trigg_work_t *work)
 
     work->base = 0x00000001;
     work->end  = 0x23c3ffff;
-    work->target  = 0x0001ffff;
+    work->target  = 0x00000000;
     slogx(CLOG, CCL_CYAN "CONST: %03d,[0x%08x,0x%08x],0x%08x\n" CCL_END, id, work->base, work->end, work->target);
 
     // midstate
