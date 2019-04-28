@@ -27,6 +27,7 @@ chip_info_t chip_info[256];
 
 void* thread_trigg_miner(void *arg);
 void* thread_trigg_pool(void *arg);
+void* thread_trigg_submit(void *arg);
 int trigg_coreipl_copy(uint32_t *dst, uint32_t *src);
 int trigg_cand_copy(trigg_cand_t *dst, trigg_cand_t *src);
 void trigg_solve(trigg_work_t *work);
@@ -80,6 +81,11 @@ int trigg_init(start_info_t *sinfo)
 
     if (pthread_create(&triggm.thr_upstream, NULL, thread_upstream, &triggm) != 0) {
         sloge(triggm.log, "create 'thread_upstream' fail: %s\n", strerror(errno));
+        return -1;
+    }
+
+    if (pthread_create(&triggm.thr_submit, NULL, thread_trigg_submit, &triggm) != 0) {
+        sloge(triggm.log, "create 'thread_trigg_submit' fail: %s\n", strerror(errno));
         return -1;
     }
 
@@ -313,7 +319,10 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
 
 int trigg_submit(trigg_work_t *work)
 {
-    trigg_cand_t cand_submit;
+    char msg_buf[sizeof(core_msg_t) + sizeof(trigg_cand_t)] = {0};
+    core_msg_t *msg_hdr = (core_msg_t *)msg_buf;
+    trigg_cand_t *cand_submit = (trigg_cand_t *)msg_hdr->data;
+    msg_hdr->len = sizeof(trigg_cand_t);
 
     trigg_patch_wallet(work, triggm.wallet);
     btrailer_t *bt = work->cand.cand_trailer;
@@ -339,9 +348,9 @@ int trigg_submit(trigg_work_t *work)
     sha256_final(&bctx, work->cand.cand_trailer->bhash);
 
     // push submit data
-    memset(&cand_submit, 0, sizeof(trigg_cand_t));
-    trigg_cand_copy(&cand_submit, &work->cand);         // free cand_submit in thread submit
-    thrq_send(&triggm.thrq_submit, &cand_submit, sizeof(cand_submit));
+    memset(cand_submit, 0, sizeof(trigg_cand_t));
+    trigg_cand_copy(cand_submit, &work->cand);         // free cand_submit in thread submit
+    thrq_send(&triggm.thrq_submit, msg_buf, sizeof(core_msg_t) + msg_hdr->len);
 
     //for (int j=0; j<CORELISTLEN; j++) {
     //    pthread_testcancel();
@@ -378,7 +387,6 @@ void* thread_trigg_submit(void *arg)
             }
         }
 
-        sloge(CLOG, "receive work, block num %08x\n", *((int *)(cand->cand_trailer->bnum)));
         for (int j=0; j<CORELISTLEN; j++) {
             pthread_testcancel();
             int ret = send_mblock(cand);
@@ -389,8 +397,8 @@ void* thread_trigg_submit(void *arg)
             (cand->coreip_ix)++;
             if (cand->coreip_ix >= CORELISTLEN) 
                 cand->coreip_ix = 0;
-            free(cand->cand_data);
         }
+        free(cand->cand_data);
     }
 }
 
