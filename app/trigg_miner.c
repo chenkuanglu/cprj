@@ -150,12 +150,19 @@ int trigg_post_constant(int id, trigg_work_t *work)
 
     // make constant
     int len = 184;
+    int hnonce = 0x480;
+    int pading[2];
+    pading[0] = 0x00000080;
+    pading[1] = 0x00000000;
     memcpy(buf, &work->base, 4);
     memcpy(buf+4, &work->end, 4);
     memcpy(buf+4+4, ctx.state, 32);
     memcpy(buf+4+4+32, ((char *)work->chain) + 256, 32);
     memcpy(buf+4+4+32+32, &work->target, 4);
-    memcpy(buf+4+4+32+32+4, work->cand.cand_trailer->bnum, 8);
+    memcpy(buf+4+4+32+32+4, &hnonce, 4);
+    // 0x00000000, 0x00000000
+    memcpy(buf+4+4+32+32+4+12, work->cand.cand_trailer->bnum, 8);
+    memcpy(buf+4+4+32+32+4+12+8, pading, 8);
 
     cr190_write_l(triggm.fd_dev, id, 0x40, buf, len);
     return 0;
