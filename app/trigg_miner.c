@@ -122,7 +122,7 @@ int trigg_post_constant(int id, trigg_work_t *work)
     char buf[184] = {0};
 
     work->base = 0x00000001;
-    work->end  = 0x23c3ffff;
+    work->end  = 0xfffffff0;
     work->target  = 0x00000000;
     slogx(CLOG, CCL_CYAN "CONST: %03d,[0x%08x,0x%08x],0x%08x\n" CCL_END, id, work->base, work->end, work->target);
 
@@ -257,6 +257,8 @@ int trigg_upstream_proc(trigg_cand_t *cand, upstream_t *msg)
             break;
 
         case 0x68:
+            if (msg->data < 1000UL)
+                msg->data = 0xffffffffUL;
             work = &chip_info[id-1].work[chip_info[id-1].work_wri];
             trigg_gen_work(work, cand);
             trigg_post_constant(id, work);
