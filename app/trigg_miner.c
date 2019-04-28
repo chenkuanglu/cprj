@@ -150,7 +150,7 @@ int trigg_post_constant(int id, trigg_work_t *work)
 
     // make constant
     int len = 184;
-    int hnonce = 0x480;
+    int hnonce = 0;
     int pading[2];
     pading[0] = 0x00000080;
     pading[1] = 0x00000000;

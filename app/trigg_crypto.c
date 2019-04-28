@@ -70,10 +70,6 @@ byte *trigg_gen_seed(byte *seed)
     uint32_t thread = *((uint32_t *)seed);
     memset(seed, 0, 16);
     
-    if (thread > 600047615UL) {
-        return NULL;
-    }
-
     if (0 < thread && thread <= 131071) { /* Total Permutations, this frame: 131,072 */
         seed[0] = Z_PREP[(thread & 7)];
         seed[1] = Z_TIMED[(thread >> 3) & 7];
@@ -152,6 +148,39 @@ byte *trigg_gen_seed(byte *seed)
         seed[8] = 1;
         seed[9] = Z_INGADJ[(thread >> 23) & 63];
     }
+    //if ((uint64_t)600047615 < thread && thread <= (uint64_t)550355861503) { // Total Permutations, this frame: 549,755,813,888
+    if (0x23c3ffffUL < thread && thread <= 0xffffffffUL) { // Total Permutations, this frame: 549,755,813,888
+        seed[ 0] = Z_ING[(thread & 31)];
+        seed[ 1] = Z_PREP[(thread >> 5) & 7];
+        seed[ 2] = Z_TIME[(thread >> 8) & 15];
+        seed[ 3] = Z_MASS[(thread >> 12) & 31];
+        seed[ 4] = 1;
+        seed[ 5] = Z_MASS[(thread >> 17) & 31];
+        seed[ 6] = Z_ING[(thread >> 22) & 31];
+        seed[ 7] = 3;
+        seed[ 8] = 1;
+        seed[ 9] = 5;
+        seed[10] = Z_ADJ[(thread >> 27) & 63];
+        //seed[11] = Z_NS[(thread >> 33) & 63];
+        seed[11] = Z_NS[0];
+    }
+    /*
+    if ((uint64_t)550355861503 < thread && thread <= (uint64_t)4948402372607) { // Total Permutations, this frame: 4,398,046,511,104
+        seed[ 0] = Z_ING[(thread & 31)];
+        seed[ 1] = Z_PREP[(thread >> 5) & 7];
+        seed[ 2] = 5;
+        seed[ 3] = Z_ADJ[(thread >> 8) & 63];
+        seed[ 4] = Z_NS[(thread >> 14) & 63];
+        seed[ 5] = 1;
+        seed[ 6] = Z_MASS[(thread >> 19) & 31];
+        seed[ 7] = Z_ING[(thread >> 24) & 31];
+        seed[ 8] = 3;
+        seed[ 9] = 1;
+        seed[10] = 5;
+        seed[11] = Z_ADJ[(thread >> 30) & 63];
+        seed[12] = Z_NS[(thread >> 36) & 63];
+    }
+    */
 
     return seed;
 }
