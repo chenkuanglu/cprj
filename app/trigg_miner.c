@@ -37,14 +37,12 @@ int trigg_submit(trigg_work_t *work);
 
 int trigg_init(start_info_t *sinfo)
 {
+    slogd(CLOG, "trigg init...\n");
+
     memset(&chip_info, 0, sizeof(chip_info));
 
     memset(&triggm, 0, sizeof(trigg_miner_t));
     triggm.log = CLOG;
-
-    triggm.nodes_lst.url = sinfo->argv[1];
-    triggm.file_dev = sinfo->argv[2];
-    triggm.nodes_lst.filename = strdup("startnodes.lst");
 
     thrq_init(&triggm.thrq_submit);
     thrq_set_mpool(&triggm.thrq_submit, 0, 1024);
@@ -57,16 +55,31 @@ int trigg_init(start_info_t *sinfo)
 
     time_t stime;
     time(&stime);
-    stime = 0x12345678; // #################
+    stime = time(NULL);
     srand16(stime);
     srand2(stime, 0, 0);
     triggm.retry_num = 32;
 
-    triggm.chip_num = 2;
+    triggm.chip_num = 1;
+
+    // args
+    for (int i=1; i<sinfo->argc; i++) {
+        if (strcmp(sinfo->argv[i], "-C") == 0) {
+            triggm.chip_num = atoi(sinfo->argv[++i]);
+            slogd(CLOG, "set chip number %d\n", triggm.chip_num);
+        } else if (strcmp(sinfo->argv[i], "-o") == 0) {
+            triggm.nodes_lst.url = strdup(sinfo->argv[++i]);
+            slogd(CLOG, "set url '%s'\n", triggm.nodes_lst.url);
+        } else if (strcmp(sinfo->argv[i], "-d") == 0) {
+            triggm.file_dev = strdup(sinfo->argv[++i]);
+        }
+    }
+    triggm.nodes_lst.filename = strdup("fullnodes.lst");
 
     if ((triggm.fd_dev = ser_open(triggm.file_dev, 115200)) < 0) {
         sloge(triggm.log, "open '%s' fail: %s\n", triggm.file_dev, strerror(errno));
     }
+    slogi(CLOG, "open serial '%s'\n", triggm.file_dev);
 
     trigg_load_wallet(triggm.wallet, "maddr.dat");
 

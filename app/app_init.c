@@ -37,8 +37,6 @@ static void print_args(int argc, char **argv)
 // application init
 void app_init(start_info_t *sinfo)
 {
-    slogd(CLOG, "app init...\n");
-
 #ifdef PRINT_ARGS
     print_args(sinfo->argc, sinfo->argv);
     printf("\n");
