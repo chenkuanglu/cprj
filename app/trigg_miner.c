@@ -62,7 +62,7 @@ int trigg_init(start_info_t *sinfo)
     srand2(stime, 0, 0);
     triggm.retry_num = 32;
 
-    triggm.chip_num = 1;
+    triggm.chip_num = 2;
 
     if ((triggm.fd_dev = ser_open(triggm.file_dev, 115200)) < 0) {
         sloge(triggm.log, "open '%s' fail: %s\n", triggm.file_dev, strerror(errno));

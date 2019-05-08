@@ -67,7 +67,7 @@ typedef struct {
     char            *ending_msg;
 } trigg_work_t;
 
-#define CHIP_MAX_OUTSTANDING    1
+#define CHIP_MAX_OUTSTANDING    2
 
 #define CHIP_MSG_TIMEOUT        10.0
 
