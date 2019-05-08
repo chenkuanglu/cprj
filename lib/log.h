@@ -19,6 +19,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
+#include <libgen.h>
 
 #include "cstr.h"
 

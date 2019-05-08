@@ -18,6 +18,7 @@ typedef struct {
 
     thrq_cb_t   thrq_start;
     pthread_t   tid_start;      // thread id of main thread
+
     pthread_t   tid_sig;        // sync signal query thread id
 
     pthread_t   tid_guard;
@@ -27,7 +28,7 @@ typedef struct {
 static core_info_t core_info;
 static sigset_t mask_set;
 
-log_cb_t *core_log;
+log_cb_t *core_log = NULL;
 
 static void* thread_guard(void *arg);
 static void* thread_sig(void *arg);
@@ -35,6 +36,7 @@ static void* thread_sig(void *arg);
 __attribute__((weak)) 
 int app_init(start_info_t *sinfo) 
 { 
+    (void)sinfo;
     slogw(CLOG, "No extern app_init()\n");
     return 0;
 }
@@ -42,6 +44,7 @@ int app_init(start_info_t *sinfo)
 __attribute__((weak)) 
 void app_proper_exit(int ec) 
 { 
+    (void)ec;
     slogw(CLOG, "No extern app_proper_exit()\n");
 }
 
@@ -63,7 +66,7 @@ int core_init(start_info_t *sinfo)
     core_log = &core_info.log;
 
     if (thrq_init(&core_info.thrq_start) != 0) {
-        sloge(CLOG, "thrq_init() init start_info.tq fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
+        sloge(CLOG, "queue init fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
         return -1;
     }
 
@@ -75,7 +78,7 @@ int core_init(start_info_t *sinfo)
 
     // create signal query thread
     if (pthread_create(&core_info.tid_sig, NULL, thread_sig, &core_info) != 0) {
-        sloge(CLOG, "pthread_create() create thread_sig fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
+        sloge(CLOG, "thread create fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
         return 0;
     }
 
@@ -83,7 +86,7 @@ int core_init(start_info_t *sinfo)
         return -1;
 
     if (pthread_create(&core_info.tid_guard, NULL, thread_guard, &core_info) != 0) {
-        sloge(CLOG, "pthread_create() create thread_sig fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
+        sloge(CLOG, "thread create fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
         return -1;
     }
 
