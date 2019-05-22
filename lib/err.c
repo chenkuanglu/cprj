@@ -18,7 +18,8 @@ int err_init(void)
     err_add(LIB_ERRNO_QUE_EMPTY, "Queue empty");
     err_add(LIB_ERRNO_QUE_FULL, "Queue full");
     err_add(LIB_ERRNO_MEM_ALLOC, "Malloc fail");
-    err_add(LIB_ERRNO_MEM_OUT, "Memory out");
+    err_add(LIB_ERRNO_MBLK_SHORT, "Block size of memory-pool not enough");
+    err_add(LIB_ERRNO_RES_LIMIT, "Resources exceed limit");
     return 0;
 }
 
