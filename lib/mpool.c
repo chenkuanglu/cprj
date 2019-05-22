@@ -209,7 +209,6 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
                 }
             } 
             mux_unlock(&mpool->lock);
-            errno = ENOMEM;
             return NULL;
         }
     } else {

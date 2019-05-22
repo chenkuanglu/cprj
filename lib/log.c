@@ -124,8 +124,10 @@ int log_set_stream(log_cb_t *lcb, FILE *stream)
  **/
 int log_set_prefix(log_cb_t *lcb, log_prefix_t prefix)
 {
-    if (lcb == NULL)
+    if (lcb == NULL) {
+        errno = EINVAL;
         return -1;
+    }
     if (log_lock(lcb) != 0)
         return -1;
     lcb->prefix_callback = prefix;
