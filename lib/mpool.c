@@ -72,7 +72,7 @@ int mpool_init(mpool_t *mpool, size_t n, size_t data_size)
         for (size_t i=0; i<n; i++) {
             TAILQ_INSERT_HEAD(&mpool->hdr_free, (mpool_elm_t *)(buf_data + MPOOL_BLOCK_SIZE(data_size)*i), entry);
         }
-    }//
+    }
 
     return 0;
 }
@@ -209,7 +209,7 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
         if (!TAILQ_EMPTY(&mpool->hdr_free)) {
             mpool_elm_t *p = TAILQ_LAST(&mpool->hdr_free, __mpool_head);
             TAILQ_REMOVE(&mpool->hdr_free, p, entry);
-            TAILQ_INSERT_TAIL(&mpool->hdr_used, p, entry);
+            TAILQ_INSERT_HEAD(&mpool->hdr_used, p, entry);
             mux_unlock(&mpool->lock);
             return p->data;
         } else {
@@ -222,12 +222,13 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
                     for (i=1; i<MPOOL_BLOCK_NUM_ALLOC; i++) {
                         TAILQ_INSERT_HEAD(&mpool->hdr_free, (mpool_elm_t *)(pbuf+(i*MPOOL_BLOCK_SIZE(mpool->data_size))), entry);
                     }
-                    TAILQ_INSERT_TAIL(&mpool->hdr_used, (mpool_elm_t *)pbuf, entry);
+                    TAILQ_INSERT_HEAD(&mpool->hdr_used, (mpool_elm_t *)pbuf, entry);
                     mux_unlock(&mpool->lock);
                     return ((mpool_elm_t *)pbuf)->data;
                 }
             } 
             mux_unlock(&mpool->lock);
+            errno = LIB_ERRNO_SHORT_MPOOL;
             return NULL;
         }
     } else {

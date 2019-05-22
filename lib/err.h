@@ -26,6 +26,7 @@ extern "C" {
 #define LIB_ERRNO_MEM_ALLOC         (LIB_ERRNO_BASE + 2)
 #define LIB_ERRNO_MBLK_SHORT        (LIB_ERRNO_BASE + 3)
 #define LIB_ERRNO_RES_LIMIT         (LIB_ERRNO_BASE + 4)
+#define LIB_ERRNO_SHORT_MPOOL       (LIB_ERRNO_BASE + 5)
 
 extern int err_init(void);
 extern int err_add(int errnum, const char *str);
