@@ -30,13 +30,13 @@ extern char*    strupr          (char *s);
 
 extern int      strstrip        (char *s);
 
-extern int      bin2hex         (char *hex, const void *bin, unsigned len);
-extern char*    abin2hex        (const void *bin, unsigned len);
+extern int      bin2hex         (char *hex, const void *bin, size_t len);
+extern char*    abin2hex        (const void *bin, size_t len);
 
-extern int      hex2bin         (void *bin, const char *hex, unsigned len);
+extern int      hex2bin         (void *bin, const char *hex, size_t len);
 extern void*    ahex2bin        (const char *hex);
 
-extern int      memswap         (void *out, const void *in, unsigned len, unsigned section_size);
+extern int      memswap         (void *out, const void *in, size_t len, size_t section_size);
 
 #ifdef __cplusplus
 }

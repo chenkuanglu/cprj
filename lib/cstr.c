@@ -54,8 +54,10 @@ int strstrip(char *s)
     char *last = NULL ;
     char *dest = s;
 
-    if (s == NULL) 
-        return 0;
+    if (s == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
 
     last = s + strlen(s);
     while (isspace((int)*s) && *s) 
@@ -79,16 +81,18 @@ int strstrip(char *s)
  *
  * @return  the number of char(exclude '\0') in hex buffer
  **/
-int bin2hex(char *hex, const void *bin, unsigned len)
+int bin2hex(char *hex, const void *bin, size_t len)
 {
-    if (bin == NULL || hex == NULL || len == 0) 
-        return 0;
-    unsigned i = 0;
+    if (bin == NULL || hex == NULL || len == 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    size_t i = 0;
     for (i = 0; i < len; i++) {
         sprintf(&hex[i*2], "%02x", ((unsigned char *)bin)[i]);
     }
     hex[i*2] = '\0';
-    return i*2;
+    return (int)(i*2);
 }
 
 /**
@@ -100,7 +104,7 @@ int bin2hex(char *hex, const void *bin, unsigned len)
  *
  * Need to free the pointer returned from this func
  **/
-char* abin2hex(const void *bin, unsigned len)
+char* abin2hex(const void *bin, size_t len)
 {
     if (bin == NULL || len == 0) {
         errno = EINVAL;
@@ -110,9 +114,6 @@ char* abin2hex(const void *bin, unsigned len)
     char *s = (char*)malloc((len * 2) + 1);
     if (s != NULL) {
         bin2hex(s, bin, len);
-    } else {
-        errno = ENOMEM;
-        return NULL;
     }
     return s;
 }
@@ -127,12 +128,14 @@ char* abin2hex(const void *bin, unsigned len)
  *
  * the string 'fde' is same as '0fde'
  **/
-int hex2bin(void *bin, const char *hex, unsigned len)
+int hex2bin(void *bin, const char *hex, size_t len)
 {
-    if (bin == NULL || hex == NULL || len == 0) 
+    if (bin == NULL || hex == NULL || len == 0) {
+        errno = EINVAL;
         return 0;
+    }
 
-    unsigned len2 = len;
+    size_t len2 = len;
     char buf[4] = {0};
     if (strlen(hex) % 2) {
         buf[0] = *hex++;
@@ -147,7 +150,7 @@ int hex2bin(void *bin, const char *hex, unsigned len)
         len--;
         bin = (unsigned char *)bin + 1;
     }
-    return len2 - len;
+    return (int)(len2 - len);
 }
 
 /**
@@ -160,20 +163,17 @@ int hex2bin(void *bin, const char *hex, unsigned len)
  * the string 'fde' is same as '0fde'
  * Need to free the pointer returned from this func
  **/
-void * ahex2bin(const char *hex)
+void* ahex2bin(const char *hex)
 {
     if (hex == NULL) {
         errno = EINVAL;
         return NULL;
     }
 
-    unsigned len = strlen(hex);
+    size_t len = strlen(hex);
     unsigned char *b = (unsigned char*)malloc(len/2 + 1);
     if (b != NULL) {
         hex2bin(b, hex, len/2 + 1);
-    } else {
-        errno = ENOMEM;
-        return NULL;
     }
     return (void *)b;
 }
@@ -183,31 +183,41 @@ void * ahex2bin(const char *hex)
  * @param   out             output buffer
  *          in              input buffer
  *          len             size of input buffer
- *          section_size    size of memory section to swap
+ *          section_size    size of memory section to swap, 0 means the same as len
  *
- * len = 4:
- * section_size=2:[0][1][2][3] ===> [1][0][3][2]
- * section_size=4:[0][1][2][3] ===> [3][2][1][0], the same as big/small endian convert on integer
+ * memswap(out,int,4,2):                        [0][1][2][3] ===> [1][0][3][2]
+ * memswap(out,int,4,4):                        [0][1][2][3] ===> [3][2][1][0]
+ * memswap(out,int,4,4) + memswap(out,int,4,2): [0][1][2][3] ===> [2][3][0][1]
  *
- * section_size = 0 means section_size is the len
+ * @return  0 is ok, otherwise -1 retured and errno is set.
  *
- * @return  0 is ok 
+ * 'len' should be a multiple of the 'section_size'.
+ * 'out' is allowed to be the same as 'in'.
+ *
+ * example:
+ * char buf[] = {1,2,3,4};  // convert to {3,4,1,2}
+ * memswap(buf, buf, 4, 0);
+ * memswap(buf, buf, 4, 2);
  **/
-int memswap(void *out, const void *in, unsigned len, unsigned section_size)
+int memswap(void *out, const void *in, size_t len, size_t section_size)
 {
-    if (out == NULL || in == NULL || len % section_size)
-        return -1;
-    if (len <= 1 || section_size <= 1)
-        return 0;
-
     if (section_size == 0) {
         section_size = len;
     }
-    unsigned num = len/section_size;
-    for (unsigned i=0; i<num; i++) {
+
+    if (section_size == 0 || out == NULL || in == NULL || len % section_size) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (len <= 1 || section_size <= 1)  // no need to swap
+        return 0;
+
+    size_t num = len/section_size;
+    for (size_t i=0; i<num; i++) {
         char *pin = (char *)in + i*section_size;
         char *pout = (char *)out + i*section_size;
-        unsigned ss = 0;
+        size_t ss = 0;
         while (ss < section_size/2) {
             char c = pin[ss];
             pout[ss] = pin[section_size - ss - 1];

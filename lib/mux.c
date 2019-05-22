@@ -31,7 +31,7 @@ int mux_init(mux_t *mux)
     if ((errno = pthread_mutexattr_settype(&mux->attr, PTHREAD_MUTEX_RECURSIVE)) != 0) 
         return -1;
 
-    pthread_mutex_init(&mux->mux, &mux->attr);
+    pthread_mutex_init(&mux->mux, &mux->attr);  // always returns 0.
     return 0;
 }
 
@@ -44,7 +44,7 @@ int mux_init(mux_t *mux)
 mux_t* mux_new(mux_t **mux)
 {
     mux_t *p = (mux_t *)malloc(sizeof(mux_t));
-    if (p && (mux_init(p) < 0)) {
+    if (p && (mux_init(p) != 0)) {
         free(p);
         p = NULL;
     }

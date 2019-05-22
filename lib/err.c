@@ -1,7 +1,7 @@
 /**
  * @file    err.c
  * @author  ln
- * @brief   error number
+ * @brief   convert error number to error string
  **/
 
 #include "err.h"
@@ -52,7 +52,7 @@ char* err_string(int errnum, char *buf, size_t size)
         if (errtbl[ix] != NULL) {
             strncpy(buf, errtbl[ix], size);
         } else {
-            snprintf(buf, size, "%s %d", unknown_str, errnum);
+            snprintf(buf, size, "%s: %d", unknown_str, errnum);
         }
         buf[size-1] = '\0';
     }
