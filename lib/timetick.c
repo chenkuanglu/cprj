@@ -12,7 +12,14 @@
 extern "C" {
 #endif 
 
-// timespec to double
+/**
+ * @brief   convert timespec to double
+ * @param   tms     timespec to be convert
+ *          tm      double allocated by caller
+ *
+ * @return  if success return a pointer to the parameter 'tm'.
+ *          upon error, NULL is returned and errno is set
+ **/
 double* spec2double(const struct timespec *tms, double *tm)
 {
     if (tms == NULL || tm == NULL) {
@@ -23,7 +30,14 @@ double* spec2double(const struct timespec *tms, double *tm)
     return tm;
 }
 
-// double to timespec
+/**
+ * @brief   convert double to timespec
+ * @param   tm      double to be convert
+ *          tms     timespec allocated by caller
+ *
+ * @return  if success return a pointer to the parameter 'tms'.
+ *          upon error, NULL is returned and errno is set
+ **/
 struct timespec* double2spec(double tm, struct timespec *tms)
 {
     if (tms == NULL) {
@@ -35,7 +49,12 @@ struct timespec* double2spec(double tm, struct timespec *tms)
     return tms;
 }
 
-// get monotonic time clocks 
+/**
+ * @brief   get monotonic time clocks
+ * @param   void
+ * @return  if success return double time value,
+ *          upon error, -1 is returned and errno is set
+ **/
 double monotime(void)
 {
     double tm;
@@ -49,7 +68,13 @@ double monotime(void)
     return tm;
 }
 
-// thread sleep 
+/**
+ * @brief   time sleep
+ * @param   tm  double time value
+ * @return  On successfully sleeping for the requested interval returns 0.  
+ *          If the call is interrupted by a signal handler or encounters an error, 
+ *          then it returns -1, with errno set to indicate the error.
+ **/
 int nsleep(double tm)
 {
     struct timespec tms;
