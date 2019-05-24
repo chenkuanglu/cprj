@@ -69,7 +69,7 @@ double monotime(void)
 }
 
 /**
- * @brief   time sleep
+ * @brief   nanoseconds sleep
  * @param   tm  double time value
  * @return  On successfully sleeping for the requested interval returns 0.  
  *          If the call is interrupted by a signal handler or encounters an error, 

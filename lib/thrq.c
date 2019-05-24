@@ -128,10 +128,12 @@ void thrq_destroy(thrq_cb_t *thrq)
  *          data_size   max size of user data
  *
  * @return  0 is ok
+ *
+ * ensure that the mpool inner thrq was unused because it will be destroyed before set/init.
  **/
 int thrq_set_mpool(thrq_cb_t *thrq, size_t n, size_t data_size)
 {
-    if (mux_lock(&thrq->lock) < 0)
+    if (mux_lock(&thrq->lock) < 0)  // queue lock (not mpool lock)
         return -1;
     mpool_destroy(&thrq->mpool);
     if (mpool_init(&thrq->mpool, n, THRQ_BLOCK_SIZE(data_size)) != 0) {
