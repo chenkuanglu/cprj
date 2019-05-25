@@ -21,6 +21,7 @@ int err_init(void)
     err_add(LIB_ERRNO_MBLK_SHORT, "Block size of memory-pool not enough");
     err_add(LIB_ERRNO_RES_LIMIT, "Resources exceed limit");
     err_add(LIB_ERRNO_SHORT_MPOOL, "Short of memory-pool");
+    err_add(LIB_ERRNO_NOT_EXIST, "Objectives not exist");
     return 0;
 }
 

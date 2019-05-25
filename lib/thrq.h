@@ -7,6 +7,7 @@
 #ifndef __THR_QUEUE__
 #define __THR_QUEUE__
 
+#include <stdbool.h>
 #include <errno.h>
 #include <sys/queue.h>
 #include <pthread.h>
@@ -67,6 +68,13 @@ typedef struct {
 
 #define THRQ_BLOCK_SIZE(data_size)      (sizeof(thrq_elm_t) + (data_size))
 
+#define THRQ_INIT(q)                    thrq_init(q)
+#define THRQ_INIT_GROWN(q, s) \
+    do { \
+        thrq_init(q); \
+        thrq_set_mpool(q, 0, s); \
+    } while (0)
+
 extern int          thrq_init           (thrq_cb_t *thrq);
 extern thrq_cb_t*   thrq_new            (thrq_cb_t **thrq);
 extern void         thrq_destroy        (thrq_cb_t *thrq);
@@ -74,7 +82,7 @@ extern void         thrq_destroy        (thrq_cb_t *thrq);
 extern int          thrq_set_maxsize    (thrq_cb_t *thrq, int max_size);
 extern int          thrq_set_mpool      (thrq_cb_t *thrq, size_t n, size_t data_size);
 
-extern int          thrq_empty          (thrq_cb_t *thrq);
+extern bool         thrq_empty          (thrq_cb_t *thrq);
 extern int          thrq_count          (thrq_cb_t *thrq);
 
 extern int          thrq_send           (thrq_cb_t *thrq, void *data, int len);

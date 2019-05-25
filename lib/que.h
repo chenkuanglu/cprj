@@ -7,6 +7,7 @@
 #ifndef __QUEUE__
 #define __QUEUE__
 
+#include <stdbool.h>
 #include <errno.h>
 #include <pthread.h>
 #include "mpool.h"
@@ -97,6 +98,13 @@ typedef struct {
 #define QUE_LOCK(que)          mux_lock(&que->lock)
 #define QUE_UNLOCK(que)        mux_unlock(&que->lock)
 
+#define QUE_INIT(q)            que_init(q)
+#define QUE_INIT_GROWN(q, s) \
+    do { \
+        que_init(q); \
+        que_set_mpool(q, 0, s); \
+    } while (0)
+
 /* thread safe */
 extern int          que_init            (que_cb_t *que);
 extern que_cb_t*    que_new             (que_cb_t **que);
@@ -105,7 +113,7 @@ extern void         que_destroy         (que_cb_t *que);
 extern int          que_set_maxsize     (que_cb_t *que, int max_size);
 extern int          que_set_mpool       (que_cb_t *que, size_t n, size_t data_size);
 
-extern int          que_empty           (que_cb_t *que);
+extern bool         que_empty           (que_cb_t *que);
 extern int          que_count           (que_cb_t *que);
 
 extern int          que_insert_head     (que_cb_t *que, void *data, int len);

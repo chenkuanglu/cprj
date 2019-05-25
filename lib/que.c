@@ -4,6 +4,7 @@
  * @brief   msg queue
  **/
 
+#include "err.h"
 #include "que.h"
 #include <string.h>
 #include <stdio.h>
@@ -109,10 +110,10 @@ int que_set_maxsize(que_cb_t *que, int max_size)
  * @param   que    pointer to the queue
  * @return  true(!0) or false(0)
  **/
-int que_empty(que_cb_t *que)
+bool que_empty(que_cb_t *que)
 {
     if (mux_lock(&que->lock) < 0)
-        return 1;   // true
+        return true;
     int empty = QUE_EMPTY(que);
     mux_unlock(&que->lock);
 
@@ -155,7 +156,7 @@ int que_insert_head(que_cb_t *que, void *data, int len)
 
     if (que->count >= que->max_size) {        
         mux_unlock(&que->lock);
-        errno = EAGAIN;
+        errno = LIB_ERRNO_QUE_FULL;
         return -1;
     }
 
@@ -163,7 +164,6 @@ int que_insert_head(que_cb_t *que, void *data, int len)
     que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, QUE_BLOCK_SIZE(len));
     if (elm == 0) {
         mux_unlock(&que->lock);
-        errno = ENOMEM;
         return -1;
     }
 
@@ -204,7 +204,6 @@ int que_insert_tail(que_cb_t *que, void *data, int len)
     que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, QUE_BLOCK_SIZE(len));
     if (elm == 0) {
         mux_unlock(&que->lock);
-        errno = EAGAIN;
         return -1;
     }
 
@@ -236,13 +235,12 @@ int QUE_INSERT_AFTER(que_cb_t *que, que_elm_t *list_elm, void *data, int len)
 
     /* queue is full */
     if (que->count >= que->max_size) {        
-        errno = EAGAIN;
+        errno = LIB_ERRNO_QUE_FULL;
         return -1;
     }
 
     que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, QUE_BLOCK_SIZE(len));
     if (elm == 0) {
-        errno = ENOMEM;
         return -1;
     }
 
@@ -272,13 +270,12 @@ int QUE_INSERT_BEFORE(que_cb_t *que, que_elm_t *list_elm, void *data, int len)
 
     /* queue is full */
     if (que->count >= que->max_size) {        
-        errno = EAGAIN;
+        errno = LIB_ERRNO_QUE_FULL;
         return -1;
     }
 
     que_elm_t *elm = (que_elm_t*)mpool_malloc(&que->mpool, QUE_BLOCK_SIZE(len));
     if (elm == 0) {
-        errno = ENOMEM;
         return -1;
     }
 
@@ -303,10 +300,10 @@ void que_destroy(que_cb_t *que)
         while (!QUE_EMPTY(que)) {
             QUE_REMOVE(que, QUE_FIRST(que));
         }    
+        mpool_destroy(&que->mpool);
         mux_unlock(&que->lock);
 
         mux_destroy(&que->lock);
-        mpool_destroy(&que->mpool);
     }
 }
 
@@ -363,13 +360,17 @@ int que_concat(que_cb_t *que1, que_cb_t *que2)
  **/
 que_elm_t* QUE_FIND(que_cb_t *que, void *data, int len, que_cmp_data_t pfn_cmp)
 {
+    if (pfn_cmp == NULL)
+        pfn_cmp = memcmp;
+
     que_elm_t *var;
     QUE_FOREACH_REVERSE(var, que) {
         if (pfn_cmp(var->data, data, fmin(len, var->len)) == 0) {
             return var;
         }
-    }    
-    return 0;
+    }
+    errno = LIB_ERRNO_NOT_EXIST;
+    return NULL;
 }
 
 #ifdef __cplusplus

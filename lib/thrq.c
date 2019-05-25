@@ -5,6 +5,7 @@
  **/
 
 #include "thrq.h"
+#include "err.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,10 +115,10 @@ void thrq_destroy(thrq_cb_t *thrq)
         while (!THRQ_EMPTY(thrq)) {
             thrq_remove(thrq, THRQ_FIRST(thrq));
         }    
+        mpool_destroy(&thrq->mpool);
         mux_unlock(&thrq->lock);
 
         mux_destroy(&thrq->lock);
-        mpool_destroy(&thrq->mpool);
     }
 }
 
@@ -165,10 +166,10 @@ int thrq_set_maxsize(thrq_cb_t *thrq, int max_size)
  * @param   thrq    pointer to the queue
  * @return  true(!0) or false(0)
  **/
-int thrq_empty(thrq_cb_t *thrq)
+bool thrq_empty(thrq_cb_t *thrq)
 {
     if (mux_lock(&thrq->lock) < 0)
-        return 1;   // true
+        return true;
     int empty = THRQ_EMPTY(thrq);
     mux_unlock(&thrq->lock);
 
@@ -205,20 +206,21 @@ static int thrq_insert_tail(thrq_cb_t *thrq, void *data, int len)
         return -1;
     }
 
-    /* queue is full */
     if (mux_lock(&thrq->lock) < 0)
         return -1;
 
+    /* queue is full! */
     if (thrq->count >= thrq->max_size) {
         mux_unlock(&thrq->lock);
-        errno = EAGAIN;
+        errno = LIB_ERRNO_QUE_FULL;
         return -1;
     }
 
     thrq_elm_t *elm = (thrq_elm_t*)mpool_malloc(&thrq->mpool, THRQ_BLOCK_SIZE(len));
     if (elm == 0) {
-        mux_unlock(&thrq->lock);
-        errno = ENOMEM;
+        int ec = errno;             // backup errno
+        mux_unlock(&thrq->lock);    // errno may be modified
+        errno = ec;
         return -1;
     }
     memcpy(elm->data, data, len);
@@ -291,17 +293,13 @@ int thrq_receive(thrq_cb_t *thrq, void *buf, int max_size, double timeout)
         }
     }
     if (res != 0) {
-        const int err = res;
+        int err = res;
         mux_unlock(&thrq->lock);
         errno = err;
-        return -1;    // errno may be ETIMEDOUT
+        return -errno;      // errno may be ETIMEDOUT
     }
 
     /* data received */
-    if (THRQ_EMPTY(thrq)) {
-        mux_unlock(&thrq->lock);    // critical error !!!
-        return -1;
-    }
     thrq_elm_t *elm = THRQ_FIRST(thrq);
     res = (max_size < elm->len) ? max_size : elm->len;
     memcpy(buf, elm->data, res);
