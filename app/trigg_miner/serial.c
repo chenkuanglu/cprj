@@ -15,8 +15,8 @@
 #include <errno.h>  
 
 #include "serial.h"
-#include "../timer/timer.h"
-#include "../lib/timetick.h"
+#include "../../timer/timer.h"
+#include "../../lib/timetick.h"
 
 #ifdef __cplusplus
 extern "C"{

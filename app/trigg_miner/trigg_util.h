@@ -10,7 +10,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#include "../core/core.h"
+#include "../../core/core.h"
 #include "trigg_block.h"
 #include "trigg_rand.h"
 

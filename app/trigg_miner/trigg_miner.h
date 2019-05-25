@@ -7,7 +7,7 @@
 #ifndef __TRIGG_MINER_H__
 #define __TRIGG_MINER_H__
 
-#include "../core/core.h"
+#include "../../core/core.h"
 #include "trigg_block.h"
 
 #ifdef __cplusplus

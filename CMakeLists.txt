@@ -18,5 +18,5 @@ SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
 add_library(clib ${DIR_MOD_SRCS})
 
-add_subdirectory(app)
+add_subdirectory(app/trigg_miner)
 

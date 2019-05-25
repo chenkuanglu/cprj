@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <errno.h>
-#include "../lib/cstr.h"
+#include "../../lib/cstr.h"
 
 #ifdef __cplusplus
 extern "C" {

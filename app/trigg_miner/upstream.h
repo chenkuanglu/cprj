@@ -7,7 +7,7 @@
 #ifndef __UPSTREAM_H__
 #define __UPSTREAM_H__
 
-#include "../core/core.h"
+#include "../../core/core.h"
 #include "serial.h"
 
 #ifdef __cplusplus

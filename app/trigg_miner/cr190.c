@@ -6,7 +6,7 @@
 
 #include "cr190.h"
 #include "serial.h"
-#include "../core/core.h"
+#include "../../core/core.h"
 
 #ifdef __cplusplus
 extern "C" {

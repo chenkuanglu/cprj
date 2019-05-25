@@ -7,7 +7,7 @@
 #ifndef __APP_INIT_H__
 #define __APP_INIT_H__
 
-#include "../core/core.h"
+#include "../../core/core.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -10,7 +10,7 @@ extern "C"{
 #include <stdint.h>
 #include <string.h>
 #include <stddef.h>
-#include "../lib/mux.h"
+#include "../../lib/mux.h"
 
 #define SER_PORT_DEFAULT        "/dev/ttyAMA0"
 #define SER_BAUDRATE_DEFAULT    115200

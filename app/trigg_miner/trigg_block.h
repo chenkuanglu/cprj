@@ -7,8 +7,8 @@
 #include <string.h>
 #include <pthread.h>
 
-#include "../lib/log.h"
-#include "../lib/timetick.h"
+#include "../../lib/log.h"
+#include "../../lib/timetick.h"
 
 #ifdef __cplusplus
 extern "C" {
