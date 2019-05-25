@@ -386,7 +386,7 @@ int trigg_submit(trigg_work_t *work)
     //        work->cand.coreip_ix = 0;
     //}
 
-    memset(&cand_submit, 0, sizeof(trigg_cand_t));
+    memset(cand_submit, 0, sizeof(trigg_cand_t));
 
     return 0;
 }

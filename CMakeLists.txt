@@ -12,7 +12,7 @@ link_libraries(m)
 add_definitions("-DDEBUG")
 add_definitions("-DPRINT_ARGS")
 
-SET(CMAKE_BUILD_TYPE "Debug")
+#SET(CMAKE_BUILD_TYPE "Debug")
 SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
 SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
