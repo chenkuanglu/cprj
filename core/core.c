@@ -12,8 +12,6 @@ extern "C" {
 
 // core info
 typedef struct {
-    start_info_t start_info;    // start info
-
     log_cb_t    log;            // core log object
 
     thrq_cb_t   thrq_start;
@@ -28,45 +26,31 @@ typedef struct {
 static core_info_t core_info;
 static sigset_t mask_set;
 
-log_cb_t *core_log = NULL;
+log_cb_t *CLOG = NULL;
 
 static void* thread_guard(void *arg);
 static void* thread_sig(void *arg);
 
 __attribute__((weak)) 
-int app_init(start_info_t *sinfo) 
-{ 
-    (void)sinfo;
-    slogw(CLOG, "No extern app_init()\n");
-    return 0;
-}
-
-__attribute__((weak)) 
 void app_proper_exit(int ec) 
 { 
     (void)ec;
-    slogw(CLOG, "No extern app_proper_exit()\n");
+    slogd(CLOG, "No extern app_proper_exit()\n");
 }
 
-int core_init(start_info_t *sinfo)
+int core_start(int argc, char **argv)
 {
-    char ebuf[128];
     memset(&core_info, 0, sizeof(core_info_t));
 
-    // start info
-    core_info.start_info.argc = sinfo->argc;
-    core_info.start_info.argv = sinfo->argv;
-    core_info.start_info.tm   = sinfo->tm;
-    
+    // init error-code module
     if (err_init() != 0) 
         return -1;
-
+    // create log
     if (log_init(&core_info.log) != 0) 
         return -1;
-    core_log = &core_info.log;
-
+    CLOG = &core_info.log;
+    // create thrq
     if (thrq_init(&core_info.thrq_start) != 0) {
-        sloge(CLOG, "queue init fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
         return -1;
     }
 
@@ -75,23 +59,19 @@ int core_init(start_info_t *sinfo)
     sigaddset(&mask_set, SIGINT);
     sigaddset(&mask_set, SIGTERM);
     pthread_sigmask(SIG_BLOCK, &mask_set, NULL);
-
     // create signal query thread
     if (pthread_create(&core_info.tid_sig, NULL, thread_sig, &core_info) != 0) {
-        sloge(CLOG, "thread create fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
         return 0;
     }
 
+    // init timer
     if (tmr_init(&core_info.tmr_guard) != 0) 
         return -1;
 
     if (pthread_create(&core_info.tid_guard, NULL, thread_guard, &core_info) != 0) {
-        sloge(CLOG, "thread create fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
         return -1;
     }
 
-    app_init(&core_info.start_info);
-    
     return 0;
 }
 

@@ -23,8 +23,6 @@ extern "C" {
 typedef void (*tmr_event_proc_t)(void *arg);
 
 typedef struct {
-    int id;
-    int type;
     uint32_t ticks;
     uint32_t period;
     tmr_event_proc_t proc;
@@ -33,7 +31,10 @@ typedef struct {
 
 typedef struct {
     que_cb_t que;
+    double precise;
 } tmr_cb_t;
+
+extern tmr_cb_t tmr_def;
 
 #define TMR_EVENT_TYPE_PERIODIC     0
 #define TMR_EVENT_TYPE_ONESHOT      1
@@ -41,8 +42,11 @@ typedef struct {
 #define TMR_PERIOD                  0.1
 #define TMR_TIME2TICK(tm)           ( ceil((tm)/TMR_PERIOD) )
 
-extern tmr_cb_t tmr_def;
-extern int tmr_init_def(void);
+#define TMR_INIT()                  tmr_init(&tmr_def)
+#define TMR_ADD(id, type, period, proc, arg) \
+                                    tmr_init(&tmr_def, id, type, period, proc, arg)
+
+extern int tmr_init(tmr_cb_t *tmr);
 
 extern int tmr_init(tmr_cb_t *tmr);
 extern int tmr_add(tmr_cb_t *tmr, int id, int type, int period, tmr_event_proc_t proc, void *arg);

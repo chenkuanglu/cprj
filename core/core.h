@@ -35,13 +35,6 @@ extern "C" {
 
 #define CORE_MSG_CMD_EXPIRE     ( CORE_MSG_CMD_BASE - 1 )
 
-// start info
-typedef struct {
-    int         argc;
-    char**      argv;
-    double      tm;         // time of app startup
-} start_info_t;
-
 typedef struct {
     long    type;
     long    cmd;
@@ -56,11 +49,9 @@ typedef void* (*core_thread_t)(void *);
                                     for (;;) nsleep(60);\
                                 } while (0)
 
-extern log_cb_t *core_log;
+extern log_cb_t *CLOG;
 
-#define CLOG        core_log 
-
-extern int          core_init(start_info_t *sinfo);
+extern int          core_start(int argc, char **argv);
 extern void         core_loop(void);
 extern void         core_proper_exit(int ec);
 

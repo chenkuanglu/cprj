@@ -1,5 +1,6 @@
 #!/bin/sh
 cmake -DCMAKE_BUILD_TYPE=Debug ..
+make clean
 make
 if [ ! -x bin ]; then
     mkdir bin

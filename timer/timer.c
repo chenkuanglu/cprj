@@ -21,28 +21,38 @@ int tmr_init(tmr_cb_t *tmr)
         return -1;
     if (que_init(&tmr->que) != 0) 
         return -1;
+    tmr->precise = 0.1;     // 0.1s default
+    return 0;
+}
+
+int tmr_init(void)
+{
+    tmr_init_x(&tmr_def);
+    pthread_create(&tid_tmr_def, 0, tmr_thread_def, 0);
+    return 0;
+}
+
+int tmr_set_ticks(tmr_cb_t *tmr, double precise)
+{
+    if (tmr == NULL) 
+        return -1;
+    tmr->precise = precise;
     return 0;
 }
 
 // 100ms 
+// set 10ms 1s...
 static void* tmr_thread_def(void *arg)
 {
     pthread_t tid = pthread_self();
     pthread_detach(tid);
     for (;;) {
-        nsleep(0.1);
+        nsleep(tmr_def.precise);
         tmr_heartbeat(&tmr_def);
     }
 }
 
-int tmr_init_def(void)
-{
-    tmr_init(&tmr_def);
-    pthread_create(&tid_tmr_def, 0, tmr_thread_def, 0);
-    return 0;
-}
-
-int tmr_add(tmr_cb_t *tmr, int id, int type, int period, tmr_event_proc_t proc, void *arg)
+int tmr_add_x(tmr_cb_t *tmr, int id, int type, int period, tmr_event_proc_t proc, void *arg)
 {
     if (tmr == NULL)
         return -1;
@@ -57,7 +67,7 @@ int tmr_add(tmr_cb_t *tmr, int id, int type, int period, tmr_event_proc_t proc, 
     return res;
 }
 
-int tmr_remove(tmr_cb_t *tmr, int id)
+int tmr_remove_x(tmr_cb_t *tmr, int id)
 {
     que_elm_t *var;
     que_cb_t *pq = &tmr->que;
