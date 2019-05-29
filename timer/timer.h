@@ -23,6 +23,7 @@ extern "C" {
 typedef void (*tmr_event_proc_t)(void *arg);
 
 typedef struct {
+    int id;
     uint32_t ticks;
     uint32_t period;
     tmr_event_proc_t proc;
@@ -39,20 +40,19 @@ extern tmr_cb_t tmr_def;
 #define TMR_EVENT_TYPE_PERIODIC     0
 #define TMR_EVENT_TYPE_ONESHOT      1
 
-#define TMR_PERIOD                  0.1
-#define TMR_TIME2TICK(tm)           ( ceil((tm)/TMR_PERIOD) )
+#define TMR_TIME2TICK(tm, d)        ( ceil((tm)/(d)) )
 
-#define TMR_INIT()                  tmr_init(&tmr_def)
-#define TMR_ADD(id, type, period, proc, arg) \
-                                    tmr_init(&tmr_def, id, type, period, proc, arg)
+#define TMR_INIT()                  tmr_init(&stdtmr, 0.1)
+#define TMR_START()                 pthread_create(&tid_stdtmr, 0, thread_stdtmr, 0);
+#define TMR_ADD(id, t, f, arg)      tmr_add(&stdtmr, id, t, f, arg)
 
-extern int tmr_init(tmr_cb_t *tmr);
-
-extern int tmr_init(tmr_cb_t *tmr);
-extern int tmr_add(tmr_cb_t *tmr, int id, int type, int period, tmr_event_proc_t proc, void *arg);
+extern int tmr_init(tmr_cb_t *tmr, double precise);
+extern int tmr_add(tmr_cb_t *tmr, double time, tmr_event_proc_t proc, void *arg);
 extern int tmr_remove(tmr_cb_t *tmr, int id);
 extern void tmr_heartbeat(tmr_cb_t *tmr);
 extern void tmr_destroy(tmr_cb_t *tmr);
+
+extern void* thread_stdtmr(void *arg);
 
 #ifdef __cplusplus
 }

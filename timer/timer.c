@@ -1,7 +1,7 @@
 /**
  * @file    timer.c
  * @author  ln
- * @brief   timer 
+ * @brief   timer
  **/
 
 #include "timer.h"
@@ -12,62 +12,43 @@
 extern "C" {
 #endif 
 
-tmr_cb_t tmr_def;
-static pthread_t tid_tmr_def;
+tmr_cb_t stdtmr;
+static pthread_t tid_stdtmr;
 
-int tmr_init(tmr_cb_t *tmr)
+int tmr_init(tmr_cb_t *tmr, double precise)
 {
-    if (tmr == NULL) 
+    if (tmr == NULL || precise <= 0)
         return -1;
     if (que_init(&tmr->que) != 0) 
-        return -1;
-    tmr->precise = 0.1;     // 0.1s default
-    return 0;
-}
-
-int tmr_init(void)
-{
-    tmr_init_x(&tmr_def);
-    pthread_create(&tid_tmr_def, 0, tmr_thread_def, 0);
-    return 0;
-}
-
-int tmr_set_ticks(tmr_cb_t *tmr, double precise)
-{
-    if (tmr == NULL) 
         return -1;
     tmr->precise = precise;
     return 0;
 }
 
-// 100ms 
-// set 10ms 1s...
-static void* tmr_thread_def(void *arg)
+void* thread_stdtmr(void *arg)
 {
-    pthread_t tid = pthread_self();
-    pthread_detach(tid);
+    pthread_detach(pthread_self());
     for (;;) {
         nsleep(tmr_def.precise);
         tmr_heartbeat(&tmr_def);
     }
 }
 
-int tmr_add_x(tmr_cb_t *tmr, int id, int type, int period, tmr_event_proc_t proc, void *arg)
+int tmr_add(tmr_cb_t *tmr, int id, double time, tmr_event_proc_t proc, void *arg)
 {
-    if (tmr == NULL)
+    if (tmr == NULL || time <= 0 || proc == NULL)
         return -1;
     tmr_event_t evt;
     evt.id = id;
-    evt.type = type;
-    evt.period = period;
-    evt.ticks = period;
+    evt.period = TMR_TIME2TICK(time, tmr->precise);
+    evt.ticks = evt.period;
     evt.proc = proc;
     evt.arg = arg;
     int res = que_insert_tail(&tmr->que, &evt, sizeof(evt));
     return res;
 }
 
-int tmr_remove_x(tmr_cb_t *tmr, int id)
+int tmr_remove(tmr_cb_t *tmr, int id)
 {
     que_elm_t *var;
     que_cb_t *pq = &tmr->que;
@@ -80,7 +61,7 @@ int tmr_remove_x(tmr_cb_t *tmr, int id)
             QUE_REMOVE(&tmr->que, var);
             break;
         }
-    }    
+    }
     QUE_UNLOCK(pq);
     return 0;
 }
