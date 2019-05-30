@@ -34,12 +34,13 @@ void* thread_stdtmr(void *arg)
     }
 }
 
-int tmr_add(tmr_cb_t *tmr, int id, double time, tmr_event_proc_t proc, void *arg)
+int tmr_add(tmr_cb_t *tmr, int id, int type, double time, tmr_event_proc_t proc, void *arg)
 {
     if (tmr == NULL || time <= 0 || proc == NULL)
         return -1;
     tmr_event_t evt;
     evt.id = id;
+    evt.type = type;
     evt.period = TMR_TIME2TICK(time, tmr->precise);
     evt.ticks = evt.period;
     evt.proc = proc;

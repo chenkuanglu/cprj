@@ -18,9 +18,6 @@ typedef struct {
     pthread_t   tid_start;      // thread id of main thread
 
     pthread_t   tid_sig;        // sync signal query thread id
-
-    pthread_t   tid_guard;
-    tmr_cb_t    tmr_guard;
 } core_info_t;
 
 static core_info_t core_info;
@@ -28,17 +25,9 @@ static sigset_t mask_set;
 
 log_cb_t *CLOG = NULL;
 
-static void* thread_guard(void *arg);
 static void* thread_sig(void *arg);
 
-__attribute__((weak)) 
-void app_proper_exit(int ec) 
-{ 
-    (void)ec;
-    slogd(CLOG, "No extern app_proper_exit()\n");
-}
-
-int core_start(int argc, char **argv)
+int core_init(int argc, char **argv)
 {
     memset(&core_info, 0, sizeof(core_info_t));
 
@@ -65,7 +54,9 @@ int core_start(int argc, char **argv)
     }
 
     // init timer
-    if (tmr_init(&core_info.tmr_guard) != 0) 
+    if (TMR_INIT() != 0) 
+        return -1;
+    if (TMR_START() != 0) 
         return -1;
 
     if (pthread_create(&core_info.tid_guard, NULL, thread_guard, &core_info) != 0) {
@@ -75,73 +66,39 @@ int core_start(int argc, char **argv)
     return 0;
 }
 
-static void __core_stall(void)
-{
-    // stop timer sig to app
-    // 外部队列可能随时释放，core的安全性受app影响太大
-    // 要么写成回调函数，要么队列对象必须放在core内部，由core来管理
-}
-
-static void __core_exit(int ec)
-{
-    exit(0);
-}
-
-// main loop
-void core_loop(void)
+// wait exit code
+int core_wait_exit(void)
 {
     int ec;
     char ebuf[128];
-
     core_info.tid_start = pthread_self();
 
     for (;;) {
         if (thrq_receive(&core_info.thrq_start, &ec, sizeof(ec), 0) < 0) {
-            sloge(CLOG, "thrq_receive() from start_info.tq fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
+            sloge(CLOG, "fail to wait exit code: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
             nsleep(0.1);
             continue;
         }
-        slogd(CLOG, "main thread get exit code: %d\n", ec);
-        __core_stall();    
-        app_proper_exit(ec);
-        __core_exit(ec);
     }
+
+    return ec;
 }
 
-#define CORE_GUARD_PERIOD   TMR_TIME2TICK(1.0)
-#define CORE_GUARD_TMRID    0x100
-
-void core_guard_tmrcallback(void *arg)
+void core_send_msg(thrq_cb_t *thrq, int type, int cmd, void *data, size_t len)
 {
     core_msg_t cmsg;
-    cmsg.type = CORE_MSG_TYPE_TIMER;
-    cmsg.cmd = CORE_MSG_CMD_EXPIRE;
+    cmsg.type = type;
+    cmsg.cmd = cmd;
     cmsg.tm = monotime();
-    cmsg.len = 0;
+    cmsg.len = len;
 
     thrq_cb_t *qsend = (thrq_cb_t *)arg;
     thrq_send(qsend, &cmsg, sizeof(cmsg));
 }
 
-int core_add_guard(thrq_cb_t *thrq)
-{
-    tmr_add(&core_info.tmr_guard, CORE_GUARD_TMRID, TMR_EVENT_TYPE_PERIODIC, CORE_GUARD_PERIOD, 
-            core_guard_tmrcallback, thrq);
-    return 0;
-}
-
-static void* thread_guard(void *arg)
-{
-    pthread_t tid = pthread_self();
-    pthread_detach(tid);
-    for (;;) {
-        nsleep(TMR_PERIOD);
-        tmr_heartbeat(&core_info.tmr_guard);
-    }
-}
-
 void core_proper_exit(int ec)
 {
+    TMR_STOP();
     thrq_send(&core_info.thrq_start, &ec, sizeof(ec));
     CORE_THR_RETIRE();
 }
@@ -165,7 +122,7 @@ static void* thread_sig(void *arg)
         rc = sigwait(&sig_set, &sig);
         if (rc == 0) {
             printf("\n");   // ^C
-            sprintf(reason, "Catch signal '%s'", (sig == SIGTERM) ? "Kill" : "Ctrl-C");
+            sprintf(reason, "killed by signal '%s'", (sig == SIGTERM) ? "SIGTERM" : "SIGINT");
             slogn(CLOG, "exit, %s\n", reason);
             core_proper_exit(0);
         } else {
