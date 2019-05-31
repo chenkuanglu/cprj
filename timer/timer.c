@@ -12,6 +12,15 @@
 extern "C" {
 #endif 
 
+typedef struct {
+    int id;
+    int type;
+    uint32_t ticks;
+    uint32_t period;
+    tmr_event_proc_t proc;
+    void *arg;
+} tmr_event_t;
+
 tmr_cb_t stdtmr;
 static pthread_t tid_stdtmr;
 

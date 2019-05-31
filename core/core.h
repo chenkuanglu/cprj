@@ -51,11 +51,14 @@ typedef void* (*core_thread_t)(void *);
 
 extern log_cb_t *CLOG;
 
-extern int          core_start(int argc, char **argv);
-extern void         core_loop(void);
-extern void         core_proper_exit(int ec);
+extern int          core_init(int argc, char **argv);
+extern int          core_wait_exit(void);
+extern void         core_stop(void);
+extern void         core_exit(int ec);
 
-extern int          core_add_guard(thrq_cb_t *thrq);
+extern int          core_msg_send(thrq_cb_t *thrq, int type, int cmd, void *data, size_t len);
+extern core_msg_t*  core_msg_recv(thrq_cb_t *thrq, void *buf, size_t size);
+extern int          core_msg_count(thrq_cb_t *thrq);
 
 #ifdef __cplusplus
 }

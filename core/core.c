@@ -59,10 +59,6 @@ int core_init(int argc, char **argv)
     if (TMR_START() != 0) 
         return -1;
 
-    if (pthread_create(&core_info.tid_guard, NULL, thread_guard, &core_info) != 0) {
-        return -1;
-    }
-
     return 0;
 }
 
@@ -84,21 +80,49 @@ int core_wait_exit(void)
     return ec;
 }
 
-void core_send_msg(thrq_cb_t *thrq, int type, int cmd, void *data, size_t len)
+int core_msg_send(thrq_cb_t *thrq, int type, int cmd, void *data, size_t len)
 {
-    core_msg_t cmsg;
-    cmsg.type = type;
-    cmsg.cmd = cmd;
-    cmsg.tm = monotime();
-    cmsg.len = len;
+#define CORE_MAX_MSG_LEN    (1024 + sizeof(core_msg_t))
 
-    thrq_cb_t *qsend = (thrq_cb_t *)arg;
-    thrq_send(qsend, &cmsg, sizeof(cmsg));
+    if (len > CORE_MAX_MSG_LEN) {
+        errno = LIB_ERRNO_BUF_SHORT;
+        return -1;
+    }
+
+    char buf[CORE_MAX_MSG_LEN];
+    core_msg_t *cmsg = (core_msg_t *)buf;
+    cmsg->type = type;
+    cmsg->cmd = cmd;
+    cmsg->tm = monotime();
+    cmsg->len = len;
+    memcpy(cmsg->data, data, len);
+
+    thrq_send(qsend, &cmsg, sizeof(core_msg_t)+len);
 }
 
-void core_proper_exit(int ec)
+core_msg_t* core_msg_recv(thrq_cb_t *thrq, void *buf, size_t size)
+{
+    if (thrq == NULL || buf == NULL || size == 0) {
+        return NULL;
+    }
+    if (thrq_receive(thrq, buf, size, 0) < 0) {
+        return NULL;
+    }
+    return (core_msg_t *)buf;
+}
+
+int core_msg_count(thrq_cb_t *thrq)
+{
+    return thrq_count(thrq);
+}
+
+void core_stop(void)
 {
     TMR_STOP();
+}
+
+void core_exit(int ec)
+{
     thrq_send(&core_info.thrq_start, &ec, sizeof(ec));
     CORE_THR_RETIRE();
 }
