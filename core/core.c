@@ -75,6 +75,7 @@ int core_wait_exit(void)
             nsleep(0.1);
             continue;
         }
+        core_proper_exit(ec);
     }
 
     return ec;
@@ -116,9 +117,23 @@ int core_msg_count(thrq_cb_t *thrq)
     return thrq_count(thrq);
 }
 
+__attribute__((weak))
+void app_proper_exit(int ec)
+{
+    // app_stop1(...);
+    core_stop();
+    // app_stop2(...);
+}
+
 void core_stop(void)
 {
     TMR_STOP();
+}
+
+static void core_proper_exit(int ec)
+{
+    app_proper_exit(ec);
+    exit(ec);
 }
 
 void core_exit(int ec)
@@ -148,7 +163,7 @@ static void* thread_sig(void *arg)
             printf("\n");   // ^C
             sprintf(reason, "killed by signal '%s'", (sig == SIGTERM) ? "SIGTERM" : "SIGINT");
             slogn(CLOG, "exit, %s\n", reason);
-            core_proper_exit(0);
+            core_exit(0);
         } else {
             sloge(CLOG, "'sigwait()' fail\n");
             nsleep(0.1);
