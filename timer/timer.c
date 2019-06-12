@@ -22,7 +22,7 @@ typedef struct {
 } tmr_event_t;
 
 tmr_cb_t stdtmr;
-static pthread_t tid_stdtmr;
+pthread_t tid_stdtmr;
 
 int tmr_init(tmr_cb_t *tmr, double precise)
 {
@@ -38,8 +38,8 @@ void* thread_stdtmr(void *arg)
 {
     pthread_detach(pthread_self());
     for (;;) {
-        nsleep(tmr_def.precise);
-        tmr_heartbeat(&tmr_def);
+        nsleep(stdtmr.precise);
+        tmr_heartbeat(&stdtmr);
     }
 }
 

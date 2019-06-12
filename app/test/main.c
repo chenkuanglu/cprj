@@ -4,7 +4,7 @@
  * @brief   main function
  **/
 
-#include "core.h"
+#include "../../core/core.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,19 +13,13 @@ extern "C" {
 // main function
 int main(int argc, char **argv)
 {
-    start_info_t info;
-
-    info.argc = argc;
-    info.argv = argv;
-    info.tm = monotime();
-
     // core init
-    if (core_init(&info) != 0) {
+    if (core_init(argc, argv) != 0) {
         loge("core_init() fail: %d\n", errno);
         return 0;
     }
 
-    core_loop();
+    core_wait_exit();
 }
 
 #ifdef __cplusplus

@@ -62,6 +62,14 @@ int core_init(int argc, char **argv)
     return 0;
 }
 
+__attribute__((weak))
+void app_proper_exit(int ec)
+{
+    // app_stop1(...);
+    core_stop();
+    // app_stop2(...);
+}
+
 // wait exit code
 int core_wait_exit(void)
 {
@@ -75,7 +83,8 @@ int core_wait_exit(void)
             nsleep(0.1);
             continue;
         }
-        core_proper_exit(ec);
+        app_proper_exit(ec);
+        exit(ec);
     }
 
     return ec;
@@ -98,7 +107,7 @@ int core_msg_send(thrq_cb_t *thrq, int type, int cmd, void *data, size_t len)
     cmsg->len = len;
     memcpy(cmsg->data, data, len);
 
-    thrq_send(qsend, &cmsg, sizeof(core_msg_t)+len);
+    thrq_send(thrq, &cmsg, sizeof(core_msg_t)+len);
 }
 
 core_msg_t* core_msg_recv(thrq_cb_t *thrq, void *buf, size_t size)
@@ -117,23 +126,9 @@ int core_msg_count(thrq_cb_t *thrq)
     return thrq_count(thrq);
 }
 
-__attribute__((weak))
-void app_proper_exit(int ec)
-{
-    // app_stop1(...);
-    core_stop();
-    // app_stop2(...);
-}
-
 void core_stop(void)
 {
     TMR_STOP();
-}
-
-static void core_proper_exit(int ec)
-{
-    app_proper_exit(ec);
-    exit(ec);
 }
 
 void core_exit(int ec)

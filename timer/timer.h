@@ -28,6 +28,7 @@ typedef struct {
 } tmr_cb_t;
 
 extern tmr_cb_t stdtmr;
+extern pthread_t tid_stdtmr;
 
 #define TMR_EVENT_TYPE_PERIODIC     0
 #define TMR_EVENT_TYPE_ONESHOT      1
@@ -35,7 +36,7 @@ extern tmr_cb_t stdtmr;
 #define TMR_TIME2TICK(tm, d)        ( ceil((tm)/(d)) )
 
 #define TMR_INIT()                  tmr_init(&stdtmr, 0.1)
-#define TMR_START()                 pthread_create(&tid_stdtmr, 0, thread_stdtmr, 0);
+#define TMR_START()                 pthread_create(&tid_stdtmr, 0, thread_stdtmr, 0)
 #define TMR_STOP()                  tmr_destroy(&stdtmr);
 #define TMR_ADD(id, t, d, f, arg)   tmr_add(&stdtmr, id, t, d, f, arg)
 
