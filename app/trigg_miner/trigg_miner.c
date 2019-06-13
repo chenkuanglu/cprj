@@ -35,7 +35,7 @@ int trigg_load_wallet(char *wallet, const char *addrfile);
 int trigg_patch_wallet(trigg_work_t *work, char *wallet);
 int trigg_submit(trigg_work_t *work);
 
-int trigg_init(start_info_t *sinfo)
+int trigg_init(int argc, char **argv)
 {
     slogd(CLOG, "trigg init...\n");
 
@@ -63,15 +63,15 @@ int trigg_init(start_info_t *sinfo)
     triggm.chip_num = 1;
 
     // args
-    for (int i=1; i<sinfo->argc; i++) {
-        if (strcmp(sinfo->argv[i], "-C") == 0) {
-            triggm.chip_num = atoi(sinfo->argv[++i]);
+    for (int i=1; i<argc; i++) {
+        if (strcmp(argv[i], "-C") == 0) {
+            triggm.chip_num = atoi(argv[++i]);
             slogd(CLOG, "set chip number %d\n", triggm.chip_num);
-        } else if (strcmp(sinfo->argv[i], "-o") == 0) {
-            triggm.nodes_lst.url = strdup(sinfo->argv[++i]);
+        } else if (strcmp(argv[i], "-o") == 0) {
+            triggm.nodes_lst.url = strdup(argv[++i]);
             slogd(CLOG, "set url '%s'\n", triggm.nodes_lst.url);
-        } else if (strcmp(sinfo->argv[i], "-d") == 0) {
-            triggm.file_dev = strdup(sinfo->argv[++i]);
+        } else if (strcmp(argv[i], "-d") == 0) {
+            triggm.file_dev = strdup(argv[++i]);
         }
     }
     triggm.nodes_lst.filename = strdup("fullnodes.lst");
@@ -424,6 +424,13 @@ void* thread_trigg_submit(void *arg)
     }
 }
 
+static void second_expire_proc(void *arg)
+{
+    thrq_cb_t *q = (thrq_cb_t *)arg;
+    int cmd = CORE_MSG_CMD_EXPIRE;
+    core_msg_send(q, 0, cmd, NULL, 0);
+}
+
 void* thread_trigg_miner(void *arg)
 {
     char ebuf[128];
@@ -432,7 +439,7 @@ void* thread_trigg_miner(void *arg)
     trigg_cand_t cand_mining;
     memset(&cand_mining, 0, sizeof(trigg_cand_t));
 
-    core_add_guard(&triggm.thrq_miner);
+    TMR_ADD(100, TMR_EVENT_TYPE_PERIODIC, 1, second_expire_proc, &triggm.thrq_miner);
 
     core_msg_t *pmsg = (core_msg_t *)msg_buf;
     upstream_t *upstream = (upstream_t *)pmsg->data;
@@ -470,7 +477,7 @@ void* thread_trigg_miner(void *arg)
                     if (chip_info[j].msgid_guard) {
                         if (chip_info[j].tout_guard < monotime()) {
                             sloge(CLOG, "exit, chip %03d 0x%02x timeout\n", j+1, chip_info[j].msgid_guard);
-                            core_proper_exit(0);
+                            core_exit(0);
                         }
                     }
                 }
@@ -522,7 +529,7 @@ void* thread_trigg_pool(void *arg)
             int retry = triggm.retry_num;
             while (trigg_download_lst() != 0) {
                 if (--retry <= 0)
-                    core_proper_exit(errno);
+                    core_exit(errno);
             }
             tm_nlst = monotime();
 
@@ -542,7 +549,7 @@ void* thread_trigg_pool(void *arg)
             int retry = triggm.retry_num;
             while (trigg_get_cblock(&cand, CORELISTLEN) != 0) {     // 'cand->cand_data' may be destroyed
                 if (--retry <= 0)
-                    core_proper_exit(errno);
+                    core_exit(errno);
             }
             tm_cand = monotime();
 

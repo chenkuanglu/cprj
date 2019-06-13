@@ -8,7 +8,7 @@ fi
 if [ ! -x lib ]; then
     mkdir lib
 fi
-cp -f app/trigg_miner/trigg bin
-cp -f app/test/test bin
-cp -f libclib.a lib
+cp -vf app/trigg_miner/trigg bin
+cp -vf app/testlib/testlib bin
+cp -vf libclib.a lib
 

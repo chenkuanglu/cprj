@@ -38,7 +38,8 @@ extern pthread_t tid_stdtmr;
 #define TMR_INIT()                  tmr_init(&stdtmr, 0.1)
 #define TMR_START()                 pthread_create(&tid_stdtmr, 0, thread_stdtmr, 0)
 #define TMR_STOP()                  tmr_destroy(&stdtmr);
-#define TMR_ADD(id, t, d, f, arg)   tmr_add(&stdtmr, id, t, d, f, arg)
+#define TMR_ADD(id, t, d, fn, arg)  tmr_add(&stdtmr, id, t, d, fn, arg)
+#define TMR_REMOVE(id)              tmr_remove(&stdtmr, id)
 
 extern int tmr_init(tmr_cb_t *tmr, double precise);
 extern int tmr_add(tmr_cb_t *tmr, int id, int type, double time, tmr_event_proc_t proc, void *arg);

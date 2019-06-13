@@ -196,7 +196,6 @@ int ser_open(const char* device, int speed)
     ser_sim.version = 0x2800000d;
     ser_sim.hit_delay = 2.0;
     ser_sim.done_delay = 3.0;
-    tmr_init_def();
     return 1;
 #else 
 	int fd = open(device, O_RDWR | O_NOCTTY);
@@ -262,8 +261,8 @@ int ser_send(int fd, const void *data, int len)
     static int queid = -1;
 
     if (addr == 0x40) {
-        tmr_add(&tmr_def, queid--, TMR_EVENT_TYPE_ONESHOT, ser_sim.hit_delay/0.1, ser_sim_callback_70, &ser_sim.id_tbl[id]);
-        tmr_add(&tmr_def, queid--, TMR_EVENT_TYPE_ONESHOT, ser_sim.done_delay/0.1, ser_sim_callback_68, &ser_sim.id_tbl[id]);
+        tmr_add(&stdtmr, queid--, TMR_EVENT_TYPE_ONESHOT, ser_sim.hit_delay, ser_sim_callback_70, &ser_sim.id_tbl[id]);
+        tmr_add(&stdtmr, queid--, TMR_EVENT_TYPE_ONESHOT, ser_sim.done_delay, ser_sim_callback_68, &ser_sim.id_tbl[id]);
     }
     mux_unlock(&ser_sim.lock);
     return len;

@@ -104,8 +104,12 @@ int core_msg_send(thrq_cb_t *thrq, int type, int cmd, void *data, size_t len)
     cmsg->type = type;
     cmsg->cmd = cmd;
     cmsg->tm = monotime();
+    if (data == NULL || len == 0) {
+        len = 0;
+    } else {
+        memcpy(cmsg->data, data, len);
+    }
     cmsg->len = len;
-    memcpy(cmsg->data, data, len);
 
     thrq_send(thrq, &cmsg, sizeof(core_msg_t)+len);
 }

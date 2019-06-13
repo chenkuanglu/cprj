@@ -89,7 +89,7 @@ typedef struct {
 
 extern trigg_miner_t triggm;
 
-extern int trigg_init(start_info_t *sinfo);
+extern int trigg_init(int argc, char **argv);
 extern int trigg_download_lst(void);
 
 extern uint32_t str2ip(char *addrstr);

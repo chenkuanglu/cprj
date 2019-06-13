@@ -11,7 +11,6 @@
 extern "C" {
 #endif 
 
-#ifdef PRINT_ARGS
 static void print_args(int argc, char **argv)
 {
     int sum, num;
@@ -32,22 +31,28 @@ static void print_args(int argc, char **argv)
     slogi(CLOG, "%s\n", buf);
     free(buf);
 }
-#endif
 
 // application init
-void app_init(start_info_t *sinfo)
+int main(int argc, char **argv)
 {
-#ifdef PRINT_ARGS
-    print_args(sinfo->argc, sinfo->argv);
+    print_args(argc, argv);
     printf("\n");
-#endif
     
-    trigg_init(sinfo);
+    if (core_init(argc, argv) != 0) {
+        loge("core_init() fail: %d\n", errno);
+        return 0;
+    }
+    if (trigg_init(argc, argv) != 0) {
+        core_exit(0);
+    }
+
+    core_wait_exit();
 }
 
 void app_proper_exit(int ec)
 {
-    slogd(CLOG, "app_proper_exit(%d)...\n", ec);
+    core_stop();
+    slogd(CLOG, "trigg exit, code %d\n", ec);
 }
 
 #ifdef __cplusplus
