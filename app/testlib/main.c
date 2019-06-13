@@ -19,7 +19,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    logw("test thread queue...\n");
+    logi("test thread queue...\n");
 
     core_wait_exit();
 }
@@ -29,6 +29,7 @@ void app_proper_exit(int ec)
     // app_stop1(...);
     core_stop();
     // app_stop2(...);
+    logw("testlib exit, code %d\n", ec);
 }
 
 #ifdef __cplusplus
