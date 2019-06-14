@@ -13,8 +13,8 @@ extern "C" {
 #define MAX_ARG_NAME    64
 
 typedef struct {
-    char    name[MAX_ARG_NAME];     // option name
-    long    id;                     // short option such as 'h'
+    char    name[MAX_ARG_NAME];     // option name such as '-h', '--help', 'set', 'W'
+    long    id;                     // id for callback proc
     long    n;                      // the number of args at least
 } argparser_args_t;
 
