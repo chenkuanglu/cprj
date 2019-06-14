@@ -23,6 +23,7 @@
 #include "../lib/thrq.h"
 #include "../lib/que.h"
 #include "../timer/timer.h"
+#include "../argparser/argparser.h"
 
 #ifdef __cplusplus
 extern "C" {

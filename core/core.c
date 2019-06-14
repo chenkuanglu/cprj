@@ -111,7 +111,7 @@ int core_msg_send(thrq_cb_t *thrq, int type, int cmd, void *data, size_t len)
     }
     cmsg->len = len;
 
-    thrq_send(thrq, &cmsg, sizeof(core_msg_t)+len);
+    return thrq_send(thrq, &cmsg, sizeof(core_msg_t)+len);
 }
 
 core_msg_t* core_msg_recv(thrq_cb_t *thrq, void *buf, size_t size)

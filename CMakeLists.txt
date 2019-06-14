@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 2.6)
 
 project(apps)
 aux_source_directory(lib DIR_MOD_SRCS)
-aux_source_directory(core DIR_MOD_SRCS)
 aux_source_directory(timer DIR_MOD_SRCS)
+aux_source_directory(core DIR_MOD_SRCS)
+aux_source_directory(argparser DIR_MOD_SRCS)
 
 link_libraries(pthread)
 link_libraries(curl)

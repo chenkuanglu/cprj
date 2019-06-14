@@ -17,8 +17,12 @@
 extern "C" {
 #endif
 
-// error number: 0 ~ 1023
+// all error number: 0 ~ 1023
+// system:   0 ~ 255
+// lib:    256 ~ 511
+// app:    512 ~ 1023 (LIB_ERRNO_END + x)
 #define LIB_ERRNO_BASE              256
+#define LIB_ERRNO_END               511
 #define LIB_ERRNO_MAX_NUM           (1024 - LIB_ERRNO_BASE)
 
 #define LIB_ERRNO_QUE_EMPTY         (LIB_ERRNO_BASE + 0)

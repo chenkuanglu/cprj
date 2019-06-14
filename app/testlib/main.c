@@ -10,6 +10,16 @@
 extern "C" {
 #endif 
 
+argparser_t *cmdline;
+int parse_callback(long id, char **param, int num)
+{
+    logw("proc '%c', num=%d\n", (char)id, num);
+    for (int i=0; i<num; i++) {
+        logi("'%s'\n", param[i]);
+    }
+    return 0;
+}
+
 // main function
 int main(int argc, char **argv)
 {
@@ -19,17 +29,19 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    logi("test thread queue...\n");
+    cmdline = argparser_new(argc, argv);
+    argparser_add(cmdline, "--aaa", 'a', 0);
+    argparser_add(cmdline, "--bbb", 'b', 0);
+    argparser_add(cmdline, "--ccc", 'c', 0);
+    argparser_parse(cmdline, parse_callback);
 
     core_wait_exit();
 }
 
 void app_proper_exit(int ec)
 {
-    // app_stop1(...);
     core_stop();
-    // app_stop2(...);
-    logw("testlib exit, code %d\n", ec);
+    argparser_delete(cmdline);
 }
 
 #ifdef __cplusplus
