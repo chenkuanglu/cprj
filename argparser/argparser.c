@@ -18,13 +18,13 @@ typedef struct {
     long    n;                      // the number of args at least
 } argparser_args_t;
 
+// only compare the option's name string
 static int argcmp(const void* left, const void* right, size_t len)
 {
     if (left != NULL && right != NULL && len > 0) {
         const argparser_args_t *l = (const argparser_args_t *)left;
         const argparser_args_t *r = (const argparser_args_t *)right;
         if (strcmp(l->name, r->name) == 0)  {
-            loge("argparser: multiple arg name '%s'\n", l->name);
             return 0;
         }
     }
@@ -61,15 +61,41 @@ void argparser_delete(argparser_t* parser)
     }
 }
 
-void argparser_add(argparser_t *parser, const char* arg_name, long arg_id, int param_num)
+static argparser_args_t* argparser_exist(argparser_t *parser, const char* arg_name)
 {
-    if (parser == NULL || arg_name == NULL || arg_id <= 0 || param_num < 0) {
+    if (parser == NULL || arg_name == NULL) {
         loge("argparser: Invalid parameter\n");
-        return;
+        return NULL;
     }
     if (strlen(arg_name) > MAX_ARG_NAME - 1) {
         loge("argparser: Arg name too long\n");
-        return;
+        return NULL;
+    }
+
+    argparser_args_t arg;
+    strcpy(arg.name, arg_name);
+    arg.id = 0;
+    arg.n = 0;
+
+    que_elm_t *elm = NULL;
+    argparser_args_t *ret = NULL;
+    QUE_LOCK(parser->arg_names);
+    if ((elm=QUE_FIND(parser->arg_names, &arg, sizeof(argparser_args_t), argcmp)) != NULL) {
+        ret = QUE_ELM_DATA(elm, argparser_args_t);
+    }
+    QUE_UNLOCK(parser->arg_names);
+    return ret;
+}
+
+int argparser_add(argparser_t *parser, const char* arg_name, long arg_id, int param_num)
+{
+    if (parser == NULL || arg_name == NULL || arg_id <= 0 || param_num < 0) {
+        loge("argparser: Invalid parameter\n");
+        return -1;
+    }
+    if (strlen(arg_name) > MAX_ARG_NAME - 1) {
+        loge("argparser: Arg name too long\n");
+        return -1;
     }
 
     argparser_args_t arg;
@@ -77,11 +103,17 @@ void argparser_add(argparser_t *parser, const char* arg_name, long arg_id, int p
     arg.id = arg_id;
     arg.n = param_num;
     QUE_LOCK(parser->arg_names);
-    if (QUE_FIND(parser->arg_names, &arg, sizeof(argparser_args_t), argcmp ) == NULL) {
-        if (que_insert_head(parser->arg_names, &arg, sizeof(argparser_args_t)) < 0)
-            loge("argparser: Fail to add, cannot insert queue\n");
+    if (argparser_exist(parser, arg_name) == NULL) {
+        if (que_insert_head(parser->arg_names, &arg, sizeof(argparser_args_t)) == 0) {
+            QUE_LOCK(parser->arg_names);
+            return 0;
+        }
+    } else {
+        loge("argparser: multiple arg name '%s'\n", arg_name);
     }
-    QUE_UNLOCK(parser->arg_names);
+    QUE_LOCK(parser->arg_names);
+
+    return -1;
 }
 
 int argparser_parse(argparser_t *parser, parse_callback_t parse_proc)
@@ -89,67 +121,41 @@ int argparser_parse(argparser_t *parser, parse_callback_t parse_proc)
     if (parser == NULL || parse_proc == NULL)
         return -1;
 
+    int prev_c = 0;
     char **prev_v = NULL, **param = NULL;
-    int prev_c;
-    int prev_n;
-    int prev_i;
+    argparser_args_t *arg_tmp = NULL;
+    argparser_args_t *arg_cur = NULL;
+    argparser_args_t *arg_prev = NULL;
 
-    int found;
     int c = parser->argc - 1;
     char **v = parser->argv + 1;
     QUE_LOCK(parser->arg_names);
-    while (c > 0) {
-        que_elm_t *var;
-        argparser_args_t *arg = NULL;
-        QUE_FOREACH_REVERSE(var, parser->arg_names) {
-            arg = (argparser_args_t *)var->data;
-            if ((found = strcmp(*v, arg->name)) == 0) { 
-                prev_n = arg->n;
-                /* process the previous opt */
-                if (prev_v != NULL) {
-                    if (prev_c < prev_n) {
-                        loge("argparser: Fail to parse '%s', Short of parameter\n", *prev_v);
-                        QUE_UNLOCK(parser->arg_names);
-                        return -1;
-                    }
-                    if (prev_c == 0)
-                        param = NULL;
-                    else 
-                        param = prev_v+1;
-                    if (parse_proc(prev_i, param, prev_c) < 0) {         /* number of arg may be more than 'arg->n' */
-                        QUE_UNLOCK(parser->arg_names);
-                        return 0;                                        /* user stop parse */
-                    }
+    while (c >= 0) {
+        if (c == 0 || (arg_tmp = argparser_exist(parser, *v)) != NULL) {
+            arg_prev = arg_cur;
+            arg_cur = arg_tmp;
+            if (c == 0 || arg_prev != NULL) {
+                if (prev_c < arg_prev->n) {
+                    loge("argparser: Fail to parse '%s', Short of parameter\n", *prev_v);
+                    QUE_UNLOCK(parser->arg_names);
+                    return -1;
                 }
-
-                prev_v = v;
-                prev_i = arg->id;
-
-                prev_c = 0;
-                c--;
-                v++;
-                break;
+                if (prev_c == 0)
+                    param = NULL;
+                else 
+                    param = prev_v+1;
+                if (parse_proc(arg_prev->id, param, prev_c) < 0) {  /* number of arg may be more than 'arg->n' */
+                    QUE_UNLOCK(parser->arg_names);
+                    return 0;                                       /* user stop parse */
+                }
             }
-        }
-        if (found != 0) {
+            prev_c = 0;
+            prev_v = v;
+        } else {
             prev_c++;
-            c--;
-            v++;
         }
-    }
-
-    /* process the last opt */
-    if (prev_v != NULL) {
-        if (prev_c < prev_n) {
-            loge("argparser: Fail to parse '%s', Short of parameter\n", *prev_v);
-            QUE_UNLOCK(parser->arg_names);
-            return -1;
-        }
-        if (prev_c == 0)
-            param = NULL;
-        else 
-            param = prev_v+1;
-        parse_proc(prev_i, param, prev_c);
+        c--;
+        v++;
     }
     QUE_UNLOCK(parser->arg_names);
 
