@@ -134,7 +134,7 @@ int argparser_parse(argparser_t *parser, parse_callback_t parse_proc)
         if (c == 0 || (arg_tmp = argparser_exist(parser, *v)) != NULL) {
             arg_prev = arg_cur;
             arg_cur = arg_tmp;
-            if (c == 0 || arg_prev != NULL) {
+            if (arg_prev != NULL) {
                 if (prev_c < arg_prev->n) {
                     loge("argparser: Fail to parse '%s', Short of parameter\n", *prev_v);
                     QUE_UNLOCK(parser->arg_names);
