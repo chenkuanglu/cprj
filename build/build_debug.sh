@@ -9,5 +9,6 @@ if [ ! -x lib ]; then
     mkdir lib
 fi
 cp -f app/testlib/testlib bin
+cp -f app/test_que/test_que bin
 cp -f libclib.a lib
 

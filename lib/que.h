@@ -119,6 +119,8 @@ extern int          que_count           (que_cb_t *que);
 extern int          que_insert_head     (que_cb_t *que, void *data, int len);
 extern int          que_insert_tail     (que_cb_t *que, void *data, int len);
 
+extern int          que_remove          (que_cb_t *que, void *data, int len, que_cmp_data_t pfn_cmp);
+
 /* not thread safe */
 extern que_elm_t*   QUE_FIND            (que_cb_t *que, void *data, int len, que_cmp_data_t pfn_cmp);
 extern int          QUE_REMOVE          (que_cb_t *que, que_elm_t *elm);

@@ -316,7 +316,7 @@ void que_destroy(que_cb_t *que)
  **/
 int QUE_REMOVE(que_cb_t *que, que_elm_t *elm)
 {
-    if (que == 0 && elm == 0) {
+    if (que == 0 || elm == 0) {
         errno = EINVAL;
         return -1;
     }
@@ -325,6 +325,37 @@ int QUE_REMOVE(que_cb_t *que, que_elm_t *elm)
     if (que->count > 0) {
         que->count--;
     }
+    return 0;
+}
+
+/**
+ * @brief   remove element
+ * @param   que    ponter to the queue
+ *          data    the data to insert
+ *          len     data length
+ *          pfn_cmp     function to compare user data
+ *
+ * @return  0 is ok
+ **/
+int que_remove(que_cb_t *que, void *data, int len, que_cmp_data_t pfn_cmp)
+{
+    if (que == 0 || data == 0 || len == 0) {
+        errno = EINVAL;
+        return -1;
+    }
+    que_elm_t *elm;
+    mux_lock(&que->lock);
+    if ((elm = QUE_FIND(que, data, len, pfn_cmp)) == NULL) {
+        errno = LIB_ERRNO_NOT_EXIST;
+        mux_unlock(&que->lock);
+        return -1;
+    }
+    TAILQ_REMOVE(&que->head, elm, entry);
+    mpool_free(&que->mpool, elm);
+    if (que->count > 0) {
+        que->count--;
+    }
+    mux_unlock(&que->lock);
     return 0;
 }
 
@@ -355,6 +386,7 @@ int que_concat(que_cb_t *que1, que_cb_t *que2)
  * @param   que        queue to be insert
  *          data        the data to find
  *          len         data length
+ *          pfn_cmp     function to compare user data
  *
  * @return  return the pointer to the element found
  **/
