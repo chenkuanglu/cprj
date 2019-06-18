@@ -20,4 +20,5 @@ add_library(clib ${DIR_MOD_SRCS})
 
 add_subdirectory(app/testlib)
 add_subdirectory(app/test_que)
+add_subdirectory(app/test_udp)
 

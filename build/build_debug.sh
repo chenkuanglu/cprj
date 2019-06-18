@@ -10,5 +10,6 @@ if [ ! -x lib ]; then
 fi
 cp -f app/testlib/testlib bin
 cp -f app/test_que/test_que bin
+cp -f app/test_udp/test_udp bin
 cp -f libclib.a lib
 
