@@ -1,21 +1,26 @@
 /**
  * @file    mux.c
  * @author  ln
- * @brief   mutex, inner process & recursive
- **/
+ * @brief   创建并使用一个线程之间的、优先级继承的、可嵌套的互斥锁
+ */
 
 #include "mux.h"
-#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief   init mutex, inner process & recursive
- * @param   mutex to be init
- * @return  return 0 on success. otherwise, -1 is returned on error and errno is set.
- **/
+ * @brief   初始化一个线程之间的、优先级继承的、可嵌套的互斥锁
+ * @param   mutex   未初始化的互斥锁
+ * @return  成功返回0，失败返回-1并设置errno
+ *
+ * 举例：
+ * mux_t *mux = mux_new(NULL);
+ * or
+ * mux_t *mux = NULL;
+ * mux_new(&mux);
+ */
 int mux_init(mux_t *mux)
 {
     if (mux == NULL) {
@@ -31,16 +36,21 @@ int mux_init(mux_t *mux)
     if ((errno = pthread_mutexattr_settype(&mux->attr, PTHREAD_MUTEX_RECURSIVE)) != 0) 
         return -1;
 
-    pthread_mutex_init(&mux->mux, &mux->attr);  // always returns 0.
+    pthread_mutex_init(&mux->mux, &mux->attr);  ///< always returns 0.
     return 0;
 }
 
 /**
- * @brief   malloc & init mutex, inner process & recursive
- * @param   mux     pointer to your mutex pointer
- * @return  return a pointer to the mutex created.
- *          upon error, NULL is returned and errno is set
- **/
+ * @brief   创建一个线程之间的、优先级继承的、可嵌套的互斥锁
+ * @param   mutex   互斥锁指针的指针
+ * @return  成功返回新建的互斥锁指针，失败返回NULL并设置errno
+ *
+ * 举例：
+ * mux_t *mux = mux_new(NULL);
+ * or
+ * mux_t *mux = NULL;
+ * mux_new(&mux);
+ */
 mux_t* mux_new(mux_t **mux)
 {
     mux_t *p = (mux_t *)malloc(sizeof(mux_t));
@@ -55,12 +65,10 @@ mux_t* mux_new(mux_t **mux)
 }
 
 /**
- * @brief   destroy mutex 
- * @param   mux     mutex to be clean 
+ * @brief   销毁互斥锁
+ * @param   mutex   互斥锁指针
  * @return  void
- *
- * do not call this function if a mutex was initialized by INITIALIZER macro! 
- **/
+ */
 void mux_destroy(mux_t *mux)
 {
     if (mux) {
@@ -70,27 +78,23 @@ void mux_destroy(mux_t *mux)
 }
 
 /**
- * @brief   lock
- * @param   mutex to be lock
- * @return  return 0 on success. otherwise, -1 is returned on error and errno is set.
- **/
+ * @brief   加锁互斥锁
+ * @param   mutex   互斥锁指针
+ * @return  成功返回0，失败返回非0错误码
+ */
 int mux_lock(mux_t *mux)
 {
-    if ((errno = pthread_mutex_lock(&mux->mux)) != 0)
-        return -1;
-    return 0;
+    return pthread_mutex_lock(&mux->mux);
 }
 
 /**
- * @brief   unlock
- * @param   mutex to be unlock
- * @return  return 0 on success. otherwise, -1 is returned on error and errno is set.
- **/
+ * @brief   解锁互斥锁
+ * @param   mutex   互斥锁指针
+ * @return  成功返回0，失败返回非0错误码
+ */
 int mux_unlock(mux_t *mux)
 {
-    if ((errno = pthread_mutex_unlock(&mux->mux)) != 0)
-        return -1;
-    return 0;
+    return pthread_mutex_unlock(&mux->mux);
 }
 
 #ifdef __cplusplus

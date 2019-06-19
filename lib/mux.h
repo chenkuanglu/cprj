@@ -1,14 +1,15 @@
 /**
  * @file    mux.h
  * @author  ln
- * @brief   mutex, inner process & recursive
- **/
+ * @brief   创建并使用一个线程之间的、优先级继承的、可嵌套的互斥锁
+ */
 
 #ifndef __THR_MUX__
 #define __THR_MUX__
 
-#include <pthread.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,5 +31,5 @@ extern int      mux_unlock  (mux_t *mux);
 }
 #endif
 
-#endif /* __THR_MUX__ */
+#endif ///< __THR_MUX__
 
