@@ -15,28 +15,48 @@ extern "C" {
 argparser_t *cmdline;
 int cmdline_proc(long id, char **param, int num);
 
-int online_proc(int fd, struct sockaddr_in *src_addr, void *data, int len)
+void* thread_udp_server(void *arg)
 {
-    if (len > 0) {
-        logw("data from %s:%d: %s\n", inet_ntoa(src_addr->sin_addr), htons(src_addr->sin_port), (char*)data);
-        sendto(fd, "ok", 2, 0, (struct sockaddr *)src_addr, sizeof(struct sockaddr_in));
-    }
-    return 0;
-}
+    char buf[100] = {0};
+    const char *sinfo = "server info";
+    struct sockaddr_in src_addr;
 
-void* thread_online_listen(void *arg)
-{
-    char buf[2048] = {0};
-    netcom_t netcom;
-    socket_netcom_init(&netcom);
-    socket_set_addr(&netcom.addr_listen, INADDR_ANY, 5510);
-    netcom.recv_proc = online_proc;
-
+    int fd = udp_server_open(INADDR_ANY, 5513);
     for (;;) {
-        if (socket_server_recv(&netcom, buf, sizeof(buf)) < 0) {
+        if (udp_read(fd, buf, sizeof(buf), 0, &src_addr) < 0) {
             loge("socket recv fail: %s", strerror(errno));
             nsleep(0.1);
+            continue;
         }
+        logw("server read from '%s:%d': %s\n", inet_ntoa(GET_SOCKADDR(src_addr)), GET_SOCKPORT(src_addr), (char*)buf);
+
+        logw("server write to '%s:%d': %s\n", inet_ntoa(GET_SOCKADDR(src_addr)), GET_SOCKPORT(src_addr), (char*)sinfo);
+        udp_write(fd, sinfo, strlen(sinfo), 0, &src_addr);
+    }
+}
+
+void* thread_udp_client(void *arg)
+{
+    char buf[100] = {0};
+    const char *online = "CNMT online";
+    struct sockaddr_in src_addr;
+    struct sockaddr_in dst_addr;
+    set_sockaddr(&dst_addr, INADDR_BROADCAST, 5513);
+
+    int fd = udp_client_open();
+
+    for (;;) {
+        logi("client write to  '%s:%d': %s\n", inet_ntoa(GET_SOCKADDR(dst_addr)), GET_SOCKPORT(dst_addr), online);
+        if (udp_write(fd, online, strlen(online), 0, &dst_addr) < 0) {
+            loge("client send fail: %s", strerror(errno));
+        }
+
+        if (udp_read(fd, buf, sizeof(buf), 0, &src_addr) < 0) {
+            loge("client read fail: %s", strerror(errno));
+        }
+        logi("client read from '%s:%d': %s\n\n", inet_ntoa(GET_SOCKADDR(src_addr)), GET_SOCKPORT(src_addr), (char*)buf);
+
+        nsleep(1.0);
     }
 }
 
@@ -53,20 +73,8 @@ int main(int argc, char **argv)
     argparser_parse(cmdline, cmdline_proc);
 
     pthread_t pid;
-    pthread_create(&pid, 0, thread_online_listen, 0);
-
-    // client
-    sleep(1);
-    int opt_en = 1;
-    struct sockaddr_in addr;
-    struct sockaddr_in client_addr;
-    socklen_t len = (socklen_t)sizeof(struct sockaddr_in);
-    int fd = socket(AF_INET, SOCK_DGRAM, 0);
-    socket_set_addr(&addr, INADDR_BROADCAST, 5510);
-    setsockopt(fd, SOL_SOCKET, SO_BROADCAST | SO_REUSEADDR, (char *)&opt_en, sizeof(opt_en));
-    sendto(fd, "send myself...", 14, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
-    getsockname(fd, (struct sockaddr *)&client_addr, &len);
-    logw("get client: %s:%d\n", inet_ntoa(client_addr.sin_addr), htons(client_addr.sin_port));
+    pthread_create(&pid, 0, thread_udp_server, 0);
+    pthread_create(&pid, 0, thread_udp_client, 0);
 
     core_wait_exit();
 }

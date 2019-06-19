@@ -24,24 +24,17 @@
 extern "C" {
 #endif
 
-#define NETCOM_TYPE_UDP     1
-#define NETCOM_TYPE_TCP     2
+#define GET_SOCKADDR(s)     ( (s).sin_addr )
+#define GET_SOCKIP(s)       ( htonl((s).sin_addr.s_addr) )
+#define GET_SOCKPORT(s)     ( htons((s).sin_port) )
 
-typedef int (*socket_recv_callback_t)(int fd, struct sockaddr_in *src_addr, void *data, int len);
+extern int set_sockaddr(struct sockaddr_in *saddr, uint32_t ip, uint16_t port);
 
-typedef struct {
-    mux_t lock;
-    int type;       // udp/tcp
-    bool longpoll;  // tcp only
+extern int udp_server_open(uint32_t local_ip, uint16_t local_port);
+extern int udp_client_open(void);
 
-    int fd_server;
-	struct sockaddr_in addr_listen;
-    socket_recv_callback_t recv_proc;
-} netcom_t;
-
-extern int socket_netcom_init(netcom_t *netcom);
-extern int socket_set_addr(struct sockaddr_in *saddr, uint32_t ip, uint16_t port);
-extern int socket_server_recv(netcom_t *netcom, void *buf, int len);
+extern int udp_read(int fd, void *buf, int len, int flags, struct sockaddr_in *src_addr);
+extern int udp_write(int fd, const void *buf, size_t len, int flags, const struct sockaddr_in *dst_addr);
 
 #ifdef __cplusplus
 }
