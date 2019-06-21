@@ -15,9 +15,12 @@
 extern "C" {
 #endif
 
+/**
+ * @brief 互斥锁类型定义
+ */
 typedef struct {
-    pthread_mutex_t     mux;
-    pthread_mutexattr_t attr;
+    pthread_mutex_t     mux;        ///< linux互斥锁
+    pthread_mutexattr_t attr;       ///< linux互斥锁属性
 } mux_t;
 
 extern int      mux_init    (mux_t *mux);
