@@ -82,6 +82,35 @@ int nsleep(double tm)
     return nanosleep(&tms, NULL);
 }
 
+/////////////////////////////////////
+
+unsigned int rand_gen_seed(const void *seed, size_t len, char *file)
+{
+    uint32_t output[8];
+    struct timespec tms;
+    clock_gettime(CLOCK_MONOTONIC, &tms);
+
+    size_t file_size = getfile();
+    char *buf = (char*)malloc(len + file_size + sizeof(struct timespec));
+    FILE *fp = fopen("/etc/dhcpcd.conf", "r");
+
+
+    memcpy(buf, seed, len);
+    memcpy(buf, &tms, len);
+    if (fp) {
+        int n = fread(buf+100, 1, file_size, fp);
+        fclose(fp);
+    }
+
+   SHA256_CTX ctx;
+
+   trigg_sha256_init(&ctx);
+   sha256_update(&ctx, in, inlen);
+   sha256_final(&ctx, hashout);
+
+   return output[7];
+}
+
 #ifdef __cplusplus
 }
 #endif 
