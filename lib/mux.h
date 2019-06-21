@@ -31,5 +31,5 @@ extern int      mux_unlock  (mux_t *mux);
 }
 #endif
 
-#endif ///< __THR_MUX__
+#endif // __THR_MUX__
 

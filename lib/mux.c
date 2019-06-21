@@ -12,14 +12,11 @@ extern "C" {
 
 /**
  * @brief   初始化一个线程之间的、优先级继承的、可嵌套的互斥锁
- * @param   mutex   未初始化的互斥锁
- * @return  成功返回0，失败返回-1并设置errno
  *
- * 举例：
- * mux_t *mux = mux_new(NULL);
- * or
- * mux_t *mux = NULL;
- * mux_new(&mux);
+ * @param   mutex   未初始化的互斥锁
+ *
+ * @retval  0   成功
+ * @retval  -1  失败并设置errno
  */
 int mux_init(mux_t *mux)
 {
@@ -36,20 +33,27 @@ int mux_init(mux_t *mux)
     if ((errno = pthread_mutexattr_settype(&mux->attr, PTHREAD_MUTEX_RECURSIVE)) != 0) 
         return -1;
 
-    pthread_mutex_init(&mux->mux, &mux->attr);  ///< always returns 0.
-    return 0;
+    return pthread_mutex_init(&mux->mux, &mux->attr);
 }
 
 /**
  * @brief   创建一个线程之间的、优先级继承的、可嵌套的互斥锁
- * @param   mutex   互斥锁指针的指针
- * @return  成功返回新建的互斥锁指针，失败返回NULL并设置errno
  *
- * 举例：
+ * @param   mutex   互斥锁指针的指针
+ 
+ * @return  返回新建的互斥锁，并将该互斥锁赋给*mutex（如果mutex不为NULL的话）
+ * @retval  !NULL   成功
+ * @retval  NULL    失败并设置errno
+ *
+ * @par 示例：
+ * @code
  * mux_t *mux = mux_new(NULL);
- * or
+ * @endcode
+ * 或者
+ * @code
  * mux_t *mux = NULL;
  * mux_new(&mux);
+ * @endcode
  */
 mux_t* mux_new(mux_t **mux)
 {
@@ -66,7 +70,9 @@ mux_t* mux_new(mux_t **mux)
 
 /**
  * @brief   销毁互斥锁
+ *
  * @param   mutex   互斥锁指针
+ *
  * @return  void
  */
 void mux_destroy(mux_t *mux)
@@ -79,8 +85,11 @@ void mux_destroy(mux_t *mux)
 
 /**
  * @brief   加锁互斥锁
+ *
  * @param   mutex   互斥锁指针
- * @return  成功返回0，失败返回非0错误码
+ *
+ * @retval  0   成功
+ * @retval  !0  错误码
  */
 int mux_lock(mux_t *mux)
 {
@@ -89,8 +98,11 @@ int mux_lock(mux_t *mux)
 
 /**
  * @brief   解锁互斥锁
+ *
  * @param   mutex   互斥锁指针
- * @return  成功返回0，失败返回非0错误码
+ *
+ * @retval  0   成功
+ * @retval  !0  错误码
  */
 int mux_unlock(mux_t *mux)
 {
