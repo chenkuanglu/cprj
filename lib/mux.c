@@ -83,7 +83,7 @@ mux_t* mux_new(mux_t **mux)
  * @code
  * mux_t *mux = NULL;
  * mux_new(&mux);
- * ...
+ * //...   
  * mux_destroy(mux);
  * free(mux);
  * mux = NULL;
