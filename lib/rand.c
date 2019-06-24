@@ -44,7 +44,8 @@ unsigned int rnd_gen_seed(const void *seed, size_t len, char *file)
     sha256_update(&ctx, buf, buf_size);
     sha256_final(&ctx, hashout);
 
-   return hashout[7];
+    free(buf);
+    return hashout[7];
 }
 
 #ifdef __cplusplus
