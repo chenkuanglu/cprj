@@ -12,7 +12,7 @@
 #include <time.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include "../crypto/sha256.h"
+#include "sha256.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,23 +28,22 @@ unsigned int rnd_gen_seed(const void *seed, size_t len, char *file)
     clock_gettime(CLOCK_MONOTONIC, &tms);
     stat(file, &fstat);
     file_size = fstat.st_size;
+    file_size %= 1024*1024;         // file_size < 1M
 
     unsigned buf_size = len + sizeof(struct timespec) + file_size;
     char *buf = (char*)malloc(buf_size);
-    memcpy(buf, seed, len);
-    memcpy(buf, &tms, sizeof(struct timespec));
-    FILE *fp = fopen(file, "r");
-    if (fp) {
-        fread(buf + len + sizeof(struct timespec), 1, file_size, fp);
-        fclose(fp);
+    if (buf) {
+        memcpy(buf, seed, len);
+        memcpy(buf, &tms, sizeof(struct timespec));
+        FILE *fp = fopen(file, "r");
+        if (fp) {
+            fread(buf + len + sizeof(struct timespec), 1, file_size, fp);
+            fclose(fp);
+        }
+
+        sha256(buf, buf_size, hashout);
+        free(buf);
     }
-
-    SHA256_CTX ctx;
-    sha256_init(&ctx);
-    sha256_update(&ctx, buf, buf_size);
-    sha256_final(&ctx, hashout);
-
-    free(buf);
     return hashout[7];
 }
 

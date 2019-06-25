@@ -14,10 +14,16 @@
  *
 */
 
-#ifndef SHA256_H
-#define SHA256_H
+#ifndef __SHA256_H__
+#define __SHA256_H__
 
 #include <stddef.h>
+
+//#define LONG64 
+
+//#ifdef LONG64
+//typedef unsigned long word64;
+//#endif
 
 #ifndef WORD32
 #define WORD32
@@ -44,6 +50,7 @@ typedef struct {
 void sha256_init(SHA256_CTX *ctx);
 void sha256_update(SHA256_CTX *ctx, const byte data[], unsigned len);
 void sha256_final(SHA256_CTX *ctx, byte hash[]);  /* hash is 32 bytes */
-void sha256(const byte *in, int inlen, byte *hashout);
+void sha256(const void *in, int inlen, void *hashout);
 
 #endif   /* SHA256_H */
+
