@@ -3,10 +3,10 @@
  * @author  ln
  * @brief   将系统的、库的、app 的错误码统一起来
  *
- *          模块初始化(err_init)完成后，需要先调用err_add增加自定义的错误码和对应字符串，
- *          之后就可以通过err_string输出错误码所对应的字符串。
+ *          模块初始化(err_init())完成后，需要先调用err_add()增加自定义的错误码和对应字符串，
+ *          之后就可以通过err_string()输出错误码所对应的字符串。
  *
- *          函数err_string是线程安全的，和它用法类似的系统函数是strerror_r
+ *          函数err_string()是线程安全的，和它用法类似的标准库函数是strerror_r()
  */
 
 #ifndef __ERR_H__
@@ -42,9 +42,9 @@ extern "C" {
 #define LIB_ERRNO_SHORT_MPOOL       (LIB_ERRNO_BASE + 6)        ///< 内存池数据块耗尽
 #define LIB_ERRNO_NOT_EXIST         (LIB_ERRNO_BASE + 7)        ///< 目标不存在
 
-extern int err_init(void);
-extern int err_add(int errnum, const char *str);
-extern char *err_string(int errnum, char *buf, size_t size);
+extern int      err_init(void);
+extern int      err_add(int errnum, const char *str);
+extern char*    err_string(int errnum, char *buf, size_t size);
 
 #ifdef __cplusplus
 }
