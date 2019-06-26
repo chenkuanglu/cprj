@@ -4,6 +4,8 @@
  * @brief   创建并使用一个线程之间的、优先级继承的、可嵌套的互斥锁
  */
 
+#include <stdlib.h>
+#include <errno.h>
 #include "mux.h"
 
 #ifdef __cplusplus

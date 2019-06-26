@@ -12,11 +12,8 @@
 #ifndef __ERR_H__
 #define __ERR_H__
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <errno.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {

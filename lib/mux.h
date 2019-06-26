@@ -7,9 +7,7 @@
 #ifndef __THR_MUX__
 #define __THR_MUX__
 
-#include <stdlib.h>
 #include <pthread.h>
-#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,29 +1,23 @@
 /**
  * @file    cstr.h
  * @author  ln
- * @brief   the c string process
- **/
+ * @brief   提供方便的字符串操作
+ */
 
 #ifndef __C_STRING_H__
 #define __C_STRING_H__
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <ctype.h>
 #include <string.h>
-#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* make string */
-#define _MAKE_CSTR(s)           #s
-#define MAKE_CSTR(s)            _MAKE_CSTR(s)
+#define _MAKE_CSTR(s)           #s                      ///< 构造字符串，如果s是宏，则结果为宏名本身
+#define MAKE_CSTR(s)            _MAKE_CSTR(s)           ///< 构造字符串，如果s是宏，则结果为宏所表示的内容
 
-/* concat string */
-#define _CONCAT_STRING(l, r)    l##r
-#define CONCAT_STRING(l, r)     _CONCAT_STRING(l, r)
+#define _CONCAT_STRING(l, r)    l##r                    ///< 连接字符串，如果l,r是宏，则结果为宏名本身
+#define CONCAT_STRING(l, r)     _CONCAT_STRING(l, r)    ///< 连接字符串，如果l,r是宏，则结果为宏所表示的内容
 
 extern char*    strlwr          (char *s);
 extern char*    strupr          (char *s);

@@ -9,6 +9,10 @@
  *          函数err_string()是线程安全的，和它用法类似的标准库函数是strerror_r()
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include "err.h"
 
 #ifdef __cplusplus
