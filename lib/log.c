@@ -5,6 +5,11 @@
  **/
 
 #include "log.h"
+
+#include <stdlib.h>
+#include <errno.h>
+#include <ctype.h>
+#include <libgen.h>
  
 #ifdef __cplusplus
 extern "C" {
@@ -45,7 +50,8 @@ int log_init(log_cb_t *lcb)
         errno = EINVAL;
         return -1;
     }
-    lcb->lock = (pthread_mutex_t)PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+    lcb->lock = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+    lcb->level = LOG_PRI_DEBUG;
     lcb->stream = NULL;
     lcb->prefix_callback = log_prefix_date;
     return 0;
@@ -65,35 +71,11 @@ log_cb_t* log_new(log_cb_t **lcb)
     return p;
 }
 
-/**
- * @brief   lock the log mutex
- * @param   lcb     log control block
- * @return  0 is ok, -1 is error
- **/
-int log_lock(log_cb_t *lcb)
+int log_set_level(log_cb_t *lcb, int level)
 {
-    if (lcb == NULL) {
-        errno = EINVAL;
-        return -1;
-    }
-    if ((errno = pthread_mutex_lock(&lcb->lock)) != 0)
-        return -1;
-    return 0;
-}
-
-/**
- * @brief   unlock the log mutex
- * @param   lcb     log control block
- * @return  0 is ok
- **/
-int log_unlock(log_cb_t *lcb)
-{
-    if (lcb == NULL) {
-        errno = EINVAL;
-        return -1;
-    }
-    if ((errno = pthread_mutex_unlock(&lcb->lock)) != 0)
-        return -1;
+    pthread_mutex_lock(&lcb->lock);
+    lcb->level = level;
+    pthread_mutex_unlock(&lcb->lock);
     return 0;
 }
 
@@ -143,15 +125,18 @@ int log_set_prefix(log_cb_t *lcb, log_prefix_t prefix)
  *
  * @return  number of char printed
  **/
-int log_vfprintf(log_cb_t *lcb, const char *format, va_list param)
+int log_vfprintf(log_cb_t *lcb, int level, const char *format, va_list param)
 {
     if (lcb == NULL || format == NULL) {
         errno = EINVAL;
         return -1;
     }
 
-    if (log_lock(lcb) != 0)
-        return -1;
+    pthread_mutex_lock(&lcb->lock);
+    if (level < lcb->level) {
+        pthread_mutex_unlock(&lcb->lock);
+        return 0;
+    }
     int num = 0;
     FILE *s = lcb->stream;
     if (lcb->stream == NULL)
@@ -160,7 +145,7 @@ int log_vfprintf(log_cb_t *lcb, const char *format, va_list param)
         num += lcb->prefix_callback(s);
     num += vfprintf(s, format, param);         
     fflush(s);
-    log_unlock(lcb);
+    pthread_mutex_unlock(&lcb->lock);
     
     return num;
 }

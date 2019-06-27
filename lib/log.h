@@ -1,7 +1,7 @@
 /**
  * @file    log.h
  * @author  ln
- * @brief   print log with any prefix into file stream
+ * @brief   log信息打印，允许附加打印前缀、可重定向到文件、可设定log等级
  **/
 
 #ifndef __LOG_INFO_H__
@@ -13,15 +13,11 @@
 #endif
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdarg.h>
-#include <ctype.h>
-#include <string.h>
 #include <pthread.h>
-#include <errno.h>
-#include <libgen.h>
 
 #include "cstr.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,37 +70,42 @@ extern "C" {
 #define CCL_END                         CSIB MAKE_CSTR(SGR_INIT) CSIE
 #define CCL_INIT                        CCL_END
 
+#define LOG_PRI_DEBUG                   0   ///< 调试信息，最低等级
+#define LOG_PRI_INFO                    1   ///< 一般信息
+#define LOG_PRI_NOTIFY                  2   ///< 重要信息
+#define LOG_PRI_WARNING                 3   ///< 警告信息
+#define LOG_PRI_ERROR                   4   ///< 错误信息，最高等级
+
 typedef int (*log_prefix_t)(FILE *);
 
 typedef struct {
-    pthread_mutex_t lock; 
-    FILE*           stream;
-    log_prefix_t    prefix_callback;
+    pthread_mutex_t lock;               ///< 互斥锁
+    int             level;              ///< 当前优先级，如果打印语句的优先级低于pri，将被忽略
+    FILE*           stream;             ///< 打开(fopen)的文件流
+    log_prefix_t    prefix_callback;    ///< 用来打印log前缀的回调函数
 } log_cb_t;
 
 /* print prefix without lock */
 extern int log_prefix_date(FILE *stream);
 
 /* stdlog initializer, NULL stream means stdout */
-#define STDLOG_INITIALIZER  { PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP, NULL, log_prefix_date }
+#define STDLOG_INITIALIZER  { PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP, 0, NULL, log_prefix_date }
 
 extern log_cb_t * const stdlog;
 
-extern int          log_init        (log_cb_t *lcb);
-extern log_cb_t*    log_new         (log_cb_t **lcb);
+extern int          log_init(log_cb_t *lcb);
+extern log_cb_t*    log_new(log_cb_t **lcb);
 
-extern int          log_lock        (log_cb_t *lcb);
-extern int          log_unlock      (log_cb_t *lcb);
+extern int          log_set_level(log_cb_t *lcb, int level);
+extern int          log_set_stream(log_cb_t *lcb, FILE *stream);
+extern int          log_set_prefix(log_cb_t *lcb, log_prefix_t prefix);
 
-extern int          log_set_stream  (log_cb_t *lcb, FILE *stream);
-extern int          log_set_prefix  (log_cb_t *lcb, log_prefix_t prefix);
-
-extern int          log_vfprintf    (log_cb_t *lcb, const char *format, va_list param);
-extern int          log_fprintf     (log_cb_t *lcb, const char *format, ...);
+extern int          log_vfprintf(log_cb_t *lcb, const char *format, va_list param);
+extern int          log_fprintf(log_cb_t *lcb, const char *format, ...);
 
 /* use stdlog(stdout + date_prefix) */
-extern int          log_vprintf     (const char *format, va_list param);
-extern int          log_printf      (const char *format, ...);
+extern int          log_vprintf(const char *format, va_list param);
+extern int          log_printf(const char *format, ...);
 
 // print to stdout
 #ifdef DEBUG
