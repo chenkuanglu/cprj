@@ -206,7 +206,7 @@ void* ahex2bin(const char *hex, size_t *bin_len)
  * @param   out             输出缓存
  * @param   in              输入缓存，in和out可以相同
  * @param   len             输入数据的大小
- * @param   section_size    需要被反转的块的大小，len必须是块大小的整数倍，否则那些多余的字节将得不到转换，\n
+ * @param   section_size    需要被反转的块的大小，len必须是块大小的整数倍;\n
  *                          如果section_size为0,则section_size将被视为与len相等
  * 
  * @return  成功返回0，失败返回-1并设置errno
