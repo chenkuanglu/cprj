@@ -1,7 +1,7 @@
 /**
  * @file    log.c
  * @author  ln
- * @brief   print log with any prefix into file stream
+ * @brief   log信息打印，允许附加打印前缀、可重定向到文件、可设定log等级
  **/
 
 #include "log.h"
@@ -16,12 +16,12 @@ extern "C" {
 #endif
 
 static log_cb_t __stdlog = STDLOG_INITIALIZER;
-log_cb_t * const stdlog = &__stdlog;
+log_cb_t *stdlog = &__stdlog;
 
 /**
- * @brief   print format date like '[2019-01-01 23:59:59] '
- * @param   stream  output stream
- * @return  number of char printed
+ * @brief   打印格式化日期：'[2019-01-01 23:59:59] '
+ * @param   stream  输出流
+ * @return  成功返回实际打印字符数，失败返回-1并设置errno
  **/
 int log_prefix_date(FILE *stream)
 {
@@ -40,10 +40,13 @@ int log_prefix_date(FILE *stream)
 }
 
 /**
- * @brief   init log control block
- * @param   lcb     log control block
- * @return  0 is ok
- **/
+ * @brief   初始化log对象
+ *
+ * @param   lcb     未初始化的log对象
+ *
+ * @retval  0       成功
+ * @retval  -1      失败并设置errno
+ */
 int log_init(log_cb_t *lcb)
 {
     if (lcb == NULL) {
@@ -58,10 +61,26 @@ int log_init(log_cb_t *lcb)
 }
 
 /**
- * @brief   malloc & init log control block
- * @param   lcb     pointer to pointer of log control block
- * @return  the pointer to the log control block created, NULL returned if fail to new
- **/
+ * @brief   创建log对象
+ *
+ * @param   lcb     log对象指针的指针
+ 
+ * @return  返回新建的log对象，并将该log对象赋给*lcb（如果lcb不为NULL的话）
+ * @retval  !NULL   成功
+ * @retval  NULL    失败并设置errno
+ *
+ * @par 示例：
+ * @code
+ * log_cb_t *log = log_new(NULL);
+ * @endcode
+ * 或者
+ * @code
+ * log_cb_t *log = NULL;
+ * log_new(&log);
+ * @endcode
+ *
+ * @attention 返回的log对象需要free
+ */
 log_cb_t* log_new(log_cb_t **lcb)
 {
     log_cb_t *p = (log_cb_t *)malloc(sizeof(log_cb_t));
@@ -71,6 +90,12 @@ log_cb_t* log_new(log_cb_t **lcb)
     return p;
 }
 
+/**
+ * @brief   设置打印等级
+ * @param   lcb     log对象
+ * @param   level   打印等级
+ * @return  成功返回0，失败返回-1并设置errno
+ */
 int log_set_level(log_cb_t *lcb, int level)
 {
     pthread_mutex_lock(&lcb->lock);
@@ -80,51 +105,51 @@ int log_set_level(log_cb_t *lcb, int level)
 }
 
 /**
- * @brief   set the log output stream
- * @param   lcb     log control block
- *          stream  output file
- * @return  0 is ok
- **/
+ * @brief   设置文件流
+ * @param   lcb     log对象
+ * @param   stream  文件流指针
+ * @return  成功返回0，失败返回-1并设置errno
+ */
 int log_set_stream(log_cb_t *lcb, FILE *stream)
 {
     if (lcb == NULL || stream == NULL) {
         errno = EINVAL;
         return -1;
     }
-    if (log_lock(lcb) != 0)
-        return -1;
+    pthread_mutex_lock(&lcb->lock);
     lcb->stream = stream;
-    log_unlock(lcb);
+    pthread_mutex_unlock(&lcb->lock);
     return 0;
 }
 
 /**
- * @brief   set the log prefix callback
- * @param   lcb     log control block
- *          prefix  prefix callback function, set NULL means prefix disabled
- * @return  0 is ok
- **/
+ * @brief   设置打印前缀的回调函数
+ * @param   lcb     log对象
+ * @param   prefix  打印前缀的回调函数, NULL表示不打印前缀
+ * @return  成功返回0，失败返回-1并设置errno
+ */
 int log_set_prefix(log_cb_t *lcb, log_prefix_t prefix)
 {
     if (lcb == NULL) {
         errno = EINVAL;
         return -1;
     }
-    if (log_lock(lcb) != 0)
-        return -1;
+    pthread_mutex_lock(&lcb->lock);
     lcb->prefix_callback = prefix;
-    log_unlock(lcb);
+    pthread_mutex_unlock(&lcb->lock);
     return 0;
 }
 
 /**
- * @brief   print format string with any prefix into file stream
- * @param   lcb         log control block
- *          format      format string
- *          param       parameter list
+ * @brief   打印信息到文件
  *
- * @return  number of char printed
- **/
+ * @param   lcb         log对象
+ * @param   level       log等级
+ * @param   format      格式化字符串
+ * @param   param       参数表
+ *
+ * @return  成功返回实际打印的字符数，失败返回-1并设置errno
+ */
 int log_vfprintf(log_cb_t *lcb, int level, const char *format, va_list param)
 {
     if (lcb == NULL || format == NULL) {
@@ -151,47 +176,53 @@ int log_vfprintf(log_cb_t *lcb, int level, const char *format, va_list param)
 }
 
 /**
- * @brief   print format string with any prefix into file stream
- * @param   lcb         log control block
- *          format      format string
- *          ...         variable parameters
+ * @brief   打印信息到文件
  *
- * @return  number of char printed
- **/
-int log_fprintf(log_cb_t *lcb, const char *format, ...)
+ * @param   lcb         log对象
+ * @param   level       log等级
+ * @param   format      格式化字符串
+ * @param   ...         不定参数
+ *
+ * @return  成功返回实际打印的字符数，失败返回-1并设置errno
+ */
+int log_fprintf(log_cb_t *lcb, int level, const char *format, ...)
 {
     va_list arg;
     va_start(arg, format);    
-    int num = log_vfprintf(lcb, format, arg);  
+    int num = log_vfprintf(lcb, level, format, arg);  
     va_end(arg); 
 
     return num;
 }
 
 /**
- * @brief   print format string with date([2018-01-01 23:59:59]) prefix
- * @param   format      format string
- *          param       parameter list
+ * @brief   打印信息到屏幕
  *
- * @return  number of char printed
- **/
-int log_vprintf(const char *format, va_list param)
+ * @param   level       log等级
+ * @param   format      格式化字符串
+ * @param   param       参数表
+ *
+ * @return  成功返回实际打印的字符数，失败返回-1并设置errno
+ */
+int log_vprintf(int level, const char *format, va_list param)
 {
-    return log_vfprintf(stdlog, format, param);
+    return log_vfprintf(stdlog, level, format, param);
 }
 
 /**
- * @brief   print format string with date([2018-01-01 23:59:59]) prefix
- * @param   format      format string
- *          ...         variable parameters
+ * @brief   打印信息到屏幕
  *
- * @return  number of char printed
- **/
-int log_printf(const char *format, ...)
+ * @param   level       log等级
+ * @param   format      格式化字符串
+ * @param   ...         不定参数
+ *
+ * @return  成功返回实际打印的字符数，失败返回-1并设置errno
+ */
+int log_printf(int level, const char *format, ...)
 {
     va_list arg;
     va_start(arg, format);    
-    int num = log_vprintf(format, arg);  
+    int num = log_vprintf(level, format, arg);  
     va_end(arg); 
 
     return num;

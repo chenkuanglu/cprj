@@ -76,22 +76,22 @@ extern "C" {
 #define LOG_PRI_WARNING                 3   ///< 警告信息
 #define LOG_PRI_ERROR                   4   ///< 错误信息，最高等级
 
-typedef int (*log_prefix_t)(FILE *);
+typedef int (*log_prefix_t)(FILE *);        ///< 打印log前缀的回调函数
 
 typedef struct {
-    pthread_mutex_t lock;               ///< 互斥锁
-    int             level;              ///< 当前优先级，如果打印语句的优先级低于pri，将被忽略
-    FILE*           stream;             ///< 打开(fopen)的文件流
-    log_prefix_t    prefix_callback;    ///< 用来打印log前缀的回调函数
+    pthread_mutex_t lock;                   ///< 互斥锁
+    int             level;                  ///< 当前打印等级，如果打印语句的优先级低于level，则不会打印
+    FILE*           stream;                 ///< 打开(fopen)的文件流
+    log_prefix_t    prefix_callback;        ///< 用来打印log前缀的回调函数
 } log_cb_t;
 
 /* print prefix without lock */
-extern int log_prefix_date(FILE *stream);
+extern int log_prefix_date(FILE *stream);   ///< 用于打印日期和时间
 
 /* stdlog initializer, NULL stream means stdout */
 #define STDLOG_INITIALIZER  { PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP, 0, NULL, log_prefix_date }
 
-extern log_cb_t * const stdlog;
+extern log_cb_t *stdlog;                    ///< log模块默认创建一个标准log对象（打印到屏幕、打印前缀为当前时间、打印等级为最低）
 
 extern int          log_init(log_cb_t *lcb);
 extern log_cb_t*    log_new(log_cb_t **lcb);
@@ -100,36 +100,34 @@ extern int          log_set_level(log_cb_t *lcb, int level);
 extern int          log_set_stream(log_cb_t *lcb, FILE *stream);
 extern int          log_set_prefix(log_cb_t *lcb, log_prefix_t prefix);
 
-extern int          log_vfprintf(log_cb_t *lcb, const char *format, va_list param);
-extern int          log_fprintf(log_cb_t *lcb, const char *format, ...);
+extern int          log_vfprintf(log_cb_t *lcb, int level, const char *format, va_list param);
+extern int          log_fprintf(log_cb_t *lcb, int level, const char *format, ...);
 
 /* use stdlog(stdout + date_prefix) */
-extern int          log_vprintf(const char *format, va_list param);
-extern int          log_printf(const char *format, ...);
+extern int          log_vprintf(int level, const char *format, va_list param);
+extern int          log_printf(int level, const char *format, ...);
 
-// print to stdout
-#ifdef DEBUG
-#define logd(format, ...)       log_printf(CCL_GRAY_DARK format CCL_END, ##__VA_ARGS__)
-#else
-#define logd(format, ...)    
-#endif
-#define logx(format, ...)       log_printf(format, ##__VA_ARGS__)
-#define logi(format, ...)       log_printf(format, ##__VA_ARGS__)
-#define logn(format, ...)       log_printf(CCL_WHITE_HL format CCL_END, ##__VA_ARGS__)
-#define logw(format, ...)       log_printf(CCL_YELLOW format CCL_END, ##__VA_ARGS__)
-#define loge(format, ...)       log_printf(CCL_RED format CCL_END, ##__VA_ARGS__)
+/// 打印调试信息到屏幕
+#define logd(format, ...)       log_printf(LOG_PRI_DEBUG, CCL_GRAY_DARK format CCL_END, ##__VA_ARGS__)
+/// 打印普通信息到屏幕
+#define logi(format, ...)       log_printf(LOG_PRI_INFO, format, ##__VA_ARGS__)
+/// 打印重要信息到屏幕
+#define logn(format, ...)       log_printf(LOG_PRI_NOTIFY, CCL_WHITE_HL format CCL_END, ##__VA_ARGS__)
+/// 打印警告信息到屏幕
+#define logw(format, ...)       log_printf(LOG_PRI_WARNING, CCL_YELLOW format CCL_END, ##__VA_ARGS__)
+/// 打印错误信息到屏幕
+#define loge(format, ...)       log_printf(LOG_PRI_ERROR, CCL_RED format CCL_END, ##__VA_ARGS__)
 
-// print to stream custom
-#ifdef DEBUG
-#define slogd(s, format, ...)   log_fprintf(s, CCL_GRAY_DARK format CCL_END, ##__VA_ARGS__)
-#else
-#define slogd(s, format, ...)    
-#endif
-#define slogx(s, format, ...)   log_fprintf(s, format, ##__VA_ARGS__)
-#define slogi(s, format, ...)   log_fprintf(s, format, ##__VA_ARGS__)
-#define slogn(s, format, ...)   log_fprintf(s, CCL_WHITE_HL format CCL_END, ##__VA_ARGS__)
-#define slogw(s, format, ...)   log_fprintf(s, CCL_YELLOW format CCL_END, ##__VA_ARGS__)
-#define sloge(s, format, ...)   log_fprintf(s, CCL_RED format CCL_END, ##__VA_ARGS__)
+/// 打印调试信息到任意文件
+#define slogd(s, format, ...)   log_fprintf(s, LOG_PRI_DEBUG, CCL_GRAY_DARK format CCL_END, ##__VA_ARGS__)
+/// 打印普通信息到任意文件
+#define slogi(s, format, ...)   log_fprintf(s, LOG_PRI_INFO, format, ##__VA_ARGS__)
+/// 打印重要信息到任意文件
+#define slogn(s, format, ...)   log_fprintf(s, LOG_PRI_NOTIFY, CCL_WHITE_HL format CCL_END, ##__VA_ARGS__)
+/// 打印警告信息到任意文件
+#define slogw(s, format, ...)   log_fprintf(s, LOG_PRI_WARNING, CCL_YELLOW format CCL_END, ##__VA_ARGS__)
+/// 打印错误信息到任意文件
+#define sloge(s, format, ...)   log_fprintf(s, LOG_PRI_ERROR, CCL_RED format CCL_END, ##__VA_ARGS__)
 
 #ifdef __cplusplus
 }
