@@ -62,7 +62,7 @@ char* strupr(char *s)
  * @brief   删除给定字符串开始和结尾两处的所有空格
  * @param   s   被操作的字符串
  * @return  成功返回过滤后的字符串长度，失败返回-1并设置errno
- **/
+ */
 int strstrip(char *s)
 {
     char *last = NULL ;

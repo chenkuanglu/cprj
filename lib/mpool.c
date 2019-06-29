@@ -1,44 +1,61 @@
 /**
- * @file    mpool.c
+ * @file    mpool.h
  * @author  ln
- * @brief   memory pool managerment
- **/
+ * @brief   内存池管理，提供固定大小内存块的分配与释放(按int对齐)，避免频繁地向系统申请内存\n
+ *
+ *          内存池空间可以来自外部已分配好的较大buffer，也可以由模块内部自动malloc一块较大内存；\n
+ *          内存池大小可以由外部指定，也可以任由模块自动增长（即当内存池为空或耗尽时，
+ *          模块自动向系统一次性申请包含N个块的较大内存池）
+ *          内存池每个小块的大小（即申请与释放的固定块大小）必须外部指定，否则将与malloc等效
+ *
+ *          内存池从系统malloc到的内存块不会被free，直到内存池管理对象被销毁(mpool_destroy)
+ *
+ *          使用时只需要先初始化mpool_init，之后便可以进行“分配”mpool_malloc与“释放”mpool_free
+ */
 
 #include "mpool.h"
 #include "err.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
-#endif 
+#endif
 
 #define OFFSET_OF(TYPE, MEMBER)             ((size_t)&((TYPE *)0)->MEMBER)
 #define CONTAINER_OF(ptr, type, member)     ((type *)((char *)(ptr) - OFFSET_OF(type,member)))
 
 /**
- * @brief   Init memory pool, do not init a mpool in use before clean it,
- *          otherwise memory leaks
- * @param   mpool       memory poll
- *          n           number of data element
- *          data_size   max size of user data
+ * @brief   初始化内存池
  *
- * @return  0 is ok
+ * @param   mpool       内存池对象
+ *          data_size   用户数据大小，如果使用外部存储ebuf，data_size最好是sizeof(int)的倍数
+ *          n           最大使用的块数
+ *          ebuf        外部buffer
  *
- * MPOOL_MODE_DESTROYED: mpool been cleaned
- * mpool not available
+ * @return  成功返回0，失败返回-1并设置errno
  *
- * MPOOL_MODE_MALLOC: data_size = 0
- * use system malloc & free, mpool does nothing
+ * @par 模式说明
  *
- * MPOOL_MODE_DGROWN: n = 0, data_size != 0
- * malloc every element, but never free except mpool deleted
+ * MPOOL_MODE_DESTROYED: 未初始化
  *
- * MPOOL_MODE_ISTATIC: n != 0, data_size != 0
- * mpool once malloc/free a big pool for all n*elements
+ * MPOOL_MODE_MALLOC: data_size == 0
+ * 系统模式：直接调用系统malloc和free
  *
- * MPOOL_MODE_ESTATIC: call the function 'mpool_setbuf()'   
- * extern caller give/retrieve a big pool for all elements
- **/
-int mpool_init(mpool_t *mpool, size_t n, size_t data_size)
+ * MPOOL_MODE_DGROWN: n == 0, data_size != 0
+ * 自增长模式：内存块不够时自动malloc一个较大内存块并分割为小块以供分配
+ *
+ * MPOOL_MODE_ISTATIC: n != 0, data_size != 0, ebuf == NULL
+ * 内部模式：mpool只在初始化时malloc一个指定大小的内存块，模块保证能够分配n个块
+ *
+ * MPOOL_MODE_ESTATIC: n != 0, data_size != 0, ebuf != NULL
+ * 外部模式：由外部参数传入一个内存块，内存块大小被认定为 n*data_size
+ *
+ * @attention   由于数据大小 data_size 总是被强制与sizeof(int)对齐，\n
+ *              所以在外部模式下，实际可用的块数目 m 可能少于请求的数目 n，\n
+ *              例如 mpool_init(mpl,3,1,ebuf)会返回-1，因为 (1*3)/4=0，即无块可用
+ */
+int mpool_init(mpool_t *mpool, size_t data_size, size_t n, void *ebuf)
 {
     if (mpool == NULL) {
         errno = EINVAL;
@@ -52,45 +69,72 @@ int mpool_init(mpool_t *mpool, size_t n, size_t data_size)
     if (data_size == 0) {
         mpool->mode = MPOOL_MODE_MALLOC;
     } else {
-        if (n == 0)
+        size_t ebuf_size = data_size * n;
+
+        // sizeof(int) align
+        int align = data_size % sizeof(int);
+        if (align)
+            data_size += sizeof(int) - align;
+
+        if (n == 0) {
             mpool->mode = MPOOL_MODE_DGROWN;
-        else
-            mpool->mode = MPOOL_MODE_ISTATIC;
+        } else {
+            if (ebuf) {
+                mpool->mode = MPOOL_MODE_ESTATIC;
+                mpool->sbuf = ebuf;
+                n = ebuf_size / data_size;
+                if (n == 0) {
+                    errno = EINVAL;
+                    return -1;
+                }
+            } else {
+                mpool->mode = MPOOL_MODE_ISTATIC;
+            }
+        }
     }
     mpool->data_size = data_size;
 
     TAILQ_INIT(&mpool->hdr_free);
     TAILQ_INIT(&mpool->hdr_used);
     TAILQ_INIT(&mpool->hdr_buf);
-    if (n*data_size > 0) {  // MPOOL_MODE_ISTATIC
-        char *p = (char *)malloc(MPOOL_BLOCK_SIZE(n*MPOOL_BLOCK_SIZE(data_size)));
-        if (p == NULL) 
+    char *p;
+    if (ebuf == NULL && n*data_size > 0) {      // MPOOL_MODE_ISTATIC
+        if ((p = (char *)malloc(MPOOL_BLOCK_SIZE(n*MPOOL_BLOCK_SIZE(data_size)))) == NULL)
             return -1;
-        else 
+        else
             TAILQ_INSERT_HEAD(&mpool->hdr_buf, (mpool_elm_t *)p, entry);
-        char *buf_data = ((mpool_elm_t *)p)->data;
-        for (size_t i=0; i<n; i++) {
-            TAILQ_INSERT_HEAD(&mpool->hdr_free, (mpool_elm_t *)(buf_data + MPOOL_BLOCK_SIZE(data_size)*i), entry);
-        }
     }
 
+    char *buf_data;
+    if (ebuf)
+        buf_data = ebuf;
+    else
+        buf_data = ((mpool_elm_t *)p)->data;
+
+    for (size_t i=0; i<n; i++) {
+        TAILQ_INSERT_HEAD(  &mpool->hdr_free,
+                            (mpool_elm_t *)(buf_data + MPOOL_BLOCK_SIZE(data_size)*i),
+                            entry   );
+    }
     return 0;
 }
 
 /**
- * @brief   create mpool
- * @param   n           number of data element
- *          data_size   max size of user data
+ * @brief   新建内存池对象
+ * @param   n           最大使用的块数
+ *          data_size   用户数据大小，如果使用外部存储ebuf，data_size最好是sizeof(int)的倍数
+ *          ebuf        外部buffer
  *
- * @return  pointer to the mpool created
- **/
-mpool_t* mpool_new(size_t n, size_t data_size)
+ * @return      成功返回内存池对象指针，失败返回NULL
+ * @attention   返回的对象需要free
+ */
+mpool_t* mpool_new(size_t data_size, size_t n, void *ebuf)
 {
     mpool_t *mp = (mpool_t *)malloc(sizeof(mpool_t));
     if (mp == NULL)
         return NULL;
 
-    int ret = mpool_init(mp, n, data_size);
+    int ret = mpool_init(mp, data_size, n, ebuf);
     if (mp && (ret != 0)) {
         free(mp);
         mp = NULL;
@@ -99,28 +143,24 @@ mpool_t* mpool_new(size_t n, size_t data_size)
 }
 
 /**
- * @brief   destroy mpool, mpool will be inavailable after clean done,
- *          mpool must be init before using it
- * @param   mpool   mpool to be cleaned
- * @return  0 is ok
- *
- * mpool not available including lock/unlock after destroy!!!
- **/
+ * @brief   销毁内存池对象
+ * @param   mpool   内存池对象指针
+ * @return  成功返回0，失败返回-1并设置errno
+ */
 int mpool_destroy(mpool_t *mpool)
 {
     if (mpool == NULL) {
         errno = EINVAL;
         return -1;
     }
-    if (mux_lock(&mpool->lock) != 0)
-        return -1;
+    mux_lock(&mpool->lock);
     if (mpool->mode == MPOOL_MODE_DGROWN || mpool->mode == MPOOL_MODE_ISTATIC) {
         mpool_elm_t *p;
         TAILQ_FOREACH_REVERSE(p, &mpool->hdr_buf, __mpool_head, entry) {
             TAILQ_REMOVE(&mpool->hdr_buf, p, entry);
             free(p);
         }
-    } 
+    }
 
     TAILQ_INIT(&mpool->hdr_free);
     TAILQ_INIT(&mpool->hdr_used);
@@ -133,63 +173,15 @@ int mpool_destroy(mpool_t *mpool)
     return 0;
 }
 
-/**
- * @brief   set mpool buffer, mpool mode will be set to MPOOL_MODE_ESTATIC.
- * @param   mpool       mpool to be set
- *          buf         external buffer
- *          buf_size    buffer size
- *          data_size   max size of user data
- *
- * @return  0 is ok. -1 returned if mpool is in-service.
- *
- * mpool must be empty before mpool_setbuf called, example:
- *      mpool_init(pool, 0, 0);
- *      mpool_setbuf(...);
- *      or
- *      MPOOL_INIT_ESTATIC(...);
- **/
-int mpool_setbuf(mpool_t *mpool, char *buf, size_t buf_size, size_t data_size)
-{
-    if (mpool == NULL || buf == NULL || data_size == 0) {
-        errno = EINVAL;
-        return -1;
-    }
-    if (mux_lock(&mpool->lock) != 0)
-        return -1;
-    if (!TAILQ_EMPTY(&mpool->hdr_used)) {
-        mux_unlock(&mpool->lock);
-        errno = EBUSY;
-        return -1;
-    }
-
-    if (mpool->mode == MPOOL_MODE_DGROWN || mpool->mode == MPOOL_MODE_ISTATIC) {
-        mpool_elm_t *p;
-        TAILQ_FOREACH_REVERSE(p, &mpool->hdr_buf, __mpool_head, entry) {
-            TAILQ_REMOVE(&mpool->hdr_buf, p, entry);
-            free(p);
-        }
-    } 
-    TAILQ_INIT(&mpool->hdr_free);
-
-    mpool->sbuf = buf;
-    size_t n = buf_size / MPOOL_BLOCK_SIZE(data_size);
-    for (size_t i=0; i<n; i++) {
-        TAILQ_INSERT_HEAD(&mpool->hdr_free, (mpool_elm_t *)(buf + MPOOL_BLOCK_SIZE(data_size)*i), entry);
-    }
-    mpool->data_size = data_size;
-    mpool->mode = MPOOL_MODE_ESTATIC;
-    mux_unlock(&mpool->lock);
-    return 0;
-}
 
 /**
- * @brief   alloc memory block from mpool
- * @param   mpool   mpool to be used
- *          size    size of block wanted
+ * @brief   从内存池中分配数据
+ * @param   mpool   内存池对象指针
+ *          size    想要分配的数据大小，如果size大于块的有效数据大小，则总是分配失败
  *
- * @return  block's data field allocated by mpool
+ * @return  成功返回块内有效数据的指针，失败返回NULL并设置errno
  *
- * block = block_head + block_data, head for mpool managerment & data for user
+ * @note    大块 = 大块的表头 + (N*块)，块 = 块的表头 + 有效数据区
  **/
 void* mpool_malloc(mpool_t *mpool, size_t size)
 {
@@ -198,8 +190,7 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
         return NULL;
     }
 
-    if (mux_lock(&mpool->lock) != 0)
-        return NULL;
+    mux_lock(&mpool->lock);
     if (mpool->mode == MPOOL_MODE_MALLOC) {
         mux_unlock(&mpool->lock);
         return malloc(size);
@@ -214,19 +205,23 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
             return p->data;
         } else {
             if (mpool->mode == MPOOL_MODE_DGROWN) {
-                char *pbuf = (char *)malloc(MPOOL_BLOCK_SIZE(MPOOL_BLOCK_NUM_ALLOC*MPOOL_BLOCK_SIZE(mpool->data_size)));
+                size_t grown_size = MPOOL_BLOCK_SIZE(MPOOL_BLOCK_NUM_ALLOC *
+                                                        MPOOL_BLOCK_SIZE(mpool->data_size));
+                char *pbuf = (char *)malloc(grown_size);
                 if (pbuf) {
                     TAILQ_INSERT_HEAD(&mpool->hdr_buf, (mpool_elm_t *)pbuf, entry);
                     pbuf = ((mpool_elm_t *)pbuf)->data;
                     size_t i;
                     for (i=1; i<MPOOL_BLOCK_NUM_ALLOC; i++) {
-                        TAILQ_INSERT_HEAD(&mpool->hdr_free, (mpool_elm_t *)(pbuf+(i*MPOOL_BLOCK_SIZE(mpool->data_size))), entry);
+                        TAILQ_INSERT_HEAD(  &mpool->hdr_free,
+                                            (mpool_elm_t *)(pbuf+(i*MPOOL_BLOCK_SIZE(mpool->data_size))),
+                                            entry   );
                     }
                     TAILQ_INSERT_HEAD(&mpool->hdr_used, (mpool_elm_t *)pbuf, entry);
                     mux_unlock(&mpool->lock);
                     return ((mpool_elm_t *)pbuf)->data;
                 }
-            } 
+            }
             mux_unlock(&mpool->lock);
             errno = LIB_ERRNO_SHORT_MPOOL;
             return NULL;
@@ -239,13 +234,13 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
 }
 
 /**
- * @brief   free memory block to mpool
- * @param   mpool   mpool to be used
- *          mem     block's data to be free
+ * @brief   向内存池中释放数据
+ * @param   mpool   内存池对象指针
+ *          mem     要释放的有效数据指针，该指针指向某个块的有效数据区
  *
  * @return  void
  *
- * block = block_head + block_data, head for mpool managerment & data for user
+ * @note    程序将mem指向的地址减去一个偏移就得到了块指针
  **/
 void mpool_free(mpool_t *mpool, void *mem)
 {

@@ -18,7 +18,7 @@ SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
 add_library(clib ${DIR_MOD_SRCS})
 
-add_subdirectory(app/testlib)
+add_subdirectory(app/template)
 add_subdirectory(app/test_que)
 add_subdirectory(app/test_udp)
 
