@@ -17,7 +17,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif 
+#endif
 
 /// 如果错误码未定义，则err_string()输出该字符串
 const char unknown_str[] = "Unknown error";
@@ -43,7 +43,7 @@ int err_init(void)
     ret += err_add(LIB_ERRNO_NOT_EXIST, "Objectives not exist");
     if (ret != 0)
         return -1;
-    else 
+    else
         return 0;
 }
 
@@ -59,7 +59,7 @@ int err_init(void)
 int err_add(int errnum, const char *str)
 {
     char *p;
-    if (errnum < LIB_ERRNO_BASE || 
+    if (errnum < LIB_ERRNO_BASE ||
         errnum > (LIB_ERRNO_MAX_NUM + LIB_ERRNO_BASE - 1) || str == NULL) {
         errno = EINVAL;
         return -1;
@@ -67,7 +67,7 @@ int err_add(int errnum, const char *str)
     if ((p = strdup(str)) == NULL)
         return -1;
     int ix = errnum - LIB_ERRNO_BASE;
-    if (errtbl[ix] != NULL) 
+    if (errtbl[ix] != NULL)
         free(errtbl[ix]);
     errtbl[ix] = p;
     return 0;
@@ -106,5 +106,4 @@ char* err_string(int errnum, char *buf, size_t size)
 
 #ifdef __cplusplus
 }
-#endif 
-
+#endif

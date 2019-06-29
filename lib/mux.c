@@ -26,13 +26,13 @@ int mux_init(mux_t *mux)
         errno = EINVAL;
         return -1;
     }
-    
+
     pthread_mutexattr_init(&mux->attr);
-    if ((errno = pthread_mutexattr_setpshared(&mux->attr, PTHREAD_PROCESS_PRIVATE)) != 0) 
+    if ((errno = pthread_mutexattr_setpshared(&mux->attr, PTHREAD_PROCESS_PRIVATE)) != 0)
         return -1;
-    if ((errno = pthread_mutexattr_setprotocol(&mux->attr, PTHREAD_PRIO_INHERIT)) != 0) 
+    if ((errno = pthread_mutexattr_setprotocol(&mux->attr, PTHREAD_PRIO_INHERIT)) != 0)
         return -1;
-    if ((errno = pthread_mutexattr_settype(&mux->attr, PTHREAD_MUTEX_RECURSIVE)) != 0) 
+    if ((errno = pthread_mutexattr_settype(&mux->attr, PTHREAD_MUTEX_RECURSIVE)) != 0)
         return -1;
 
     return pthread_mutex_init(&mux->mux, &mux->attr);
@@ -42,7 +42,7 @@ int mux_init(mux_t *mux)
  * @brief   创建一个线程之间的、优先级继承的、可嵌套的互斥锁
  *
  * @param   mux     互斥锁指针的指针
- 
+
  * @return  返回新建的互斥锁，并将该互斥锁赋给*mux（如果mux不为NULL的话）
  * @retval  !NULL   成功
  * @retval  NULL    失败并设置errno
@@ -85,7 +85,7 @@ mux_t* mux_new(mux_t **mux)
  * @code
  * mux_t *mux = NULL;
  * mux_new(&mux);
- * //...   
+ * //...
  * mux_destroy(mux);
  * free(mux);
  * mux = NULL;
@@ -128,4 +128,3 @@ int mux_unlock(mux_t *mux)
 #ifdef __cplusplus
 }
 #endif
-

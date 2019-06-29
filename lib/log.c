@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <libgen.h>
- 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,12 +30,12 @@ int log_prefix_date(FILE *stream)
         return -1;
     }
 
-    struct tm ltm; 
-    time_t now = time(NULL); 
+    struct tm ltm;
+    time_t now = time(NULL);
     localtime_r(&now, &ltm);
     int num = fprintf(stream, "[%04d-%02d-%02d %02d:%02d:%02d] ",
                      ltm.tm_year + 1900, ltm.tm_mon + 1, ltm.tm_mday,
-                     ltm.tm_hour, ltm.tm_min, ltm.tm_sec);                                  
+                     ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
     return num;
 }
 
@@ -64,7 +64,7 @@ int log_init(log_cb_t *lcb)
  * @brief   创建log对象
  *
  * @param   lcb     log对象指针的指针
- 
+
  * @return  返回新建的log对象，并将该log对象赋给*lcb（如果lcb不为NULL的话）
  * @retval  !NULL   成功
  * @retval  NULL    失败并设置errno
@@ -98,6 +98,10 @@ log_cb_t* log_new(log_cb_t **lcb)
  */
 int log_set_level(log_cb_t *lcb, int level)
 {
+    if (lcb == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
     pthread_mutex_lock(&lcb->lock);
     lcb->level = level;
     pthread_mutex_unlock(&lcb->lock);
@@ -166,12 +170,12 @@ int log_vfprintf(log_cb_t *lcb, int level, const char *format, va_list param)
     FILE *s = lcb->stream;
     if (lcb->stream == NULL)
         s = stdout;
-    if (lcb->prefix_callback != NULL) 
+    if (lcb->prefix_callback != NULL)
         num += lcb->prefix_callback(s);
-    num += vfprintf(s, format, param);         
+    num += vfprintf(s, format, param);
     fflush(s);
     pthread_mutex_unlock(&lcb->lock);
-    
+
     return num;
 }
 
@@ -188,9 +192,9 @@ int log_vfprintf(log_cb_t *lcb, int level, const char *format, va_list param)
 int log_fprintf(log_cb_t *lcb, int level, const char *format, ...)
 {
     va_list arg;
-    va_start(arg, format);    
-    int num = log_vfprintf(lcb, level, format, arg);  
-    va_end(arg); 
+    va_start(arg, format);
+    int num = log_vfprintf(lcb, level, format, arg);
+    va_end(arg);
 
     return num;
 }
@@ -221,9 +225,9 @@ int log_vprintf(int level, const char *format, va_list param)
 int log_printf(int level, const char *format, ...)
 {
     va_list arg;
-    va_start(arg, format);    
-    int num = log_vprintf(level, format, arg);  
-    va_end(arg); 
+    va_start(arg, format);
+    int num = log_vprintf(level, format, arg);
+    va_end(arg);
 
     return num;
 }
