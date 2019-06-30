@@ -48,7 +48,7 @@ typedef struct __mpool {
     int             mode;       ///< 内存池工作模式
 } mpool_t;
 
-/// 内存池一次性malloc的总块数
+/// 内存池在自增长时一次性malloc的总块数
 #define MPOOL_BLOCK_NUM_ALLOC           256
 /// 块大小（块的表头 + 块的有效数据）
 #define MPOOL_BLOCK_SIZE(data_size)     (sizeof(mpool_elm_t) + data_size)

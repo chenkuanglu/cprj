@@ -245,8 +245,7 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
 void mpool_free(mpool_t *mpool, void *mem)
 {
     if (mpool && mem) {
-        if (mux_lock(&mpool->lock) != 0)
-            return;
+        mux_lock(&mpool->lock);
         if (mpool->mode == MPOOL_MODE_MALLOC) {
             mux_unlock(&mpool->lock);
             free(mem);
