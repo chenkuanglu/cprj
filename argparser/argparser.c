@@ -5,6 +5,7 @@
  **/
 
 #include "argparser.h"
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,7 +40,7 @@ argparser_t* argparser_new(int argc, char **argv)
 
     argparser_t* p = (argparser_t *)malloc(sizeof(argparser_t));
     if (p != NULL) {
-        p->arg_names = que_new(NULL);
+        p->arg_names = que_new(NULL, NULL);
         if (p->arg_names != NULL) {
             p->argc = argc;
             p->argv = argv;

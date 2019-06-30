@@ -6,11 +6,11 @@
  * run: build/app/testlib/testlib --aaa 1 --bbb 1 0x12 3
  **/
 
-#include "../../core/core.h"
+#include "../../common/common.h"
 
 #ifdef __cplusplus
 extern "C" {
-#endif 
+#endif
 
 argparser_t *cmdline;
 int cmdline_proc(long id, char **param, int num);
@@ -62,8 +62,8 @@ void* thread_udp_client(void *arg)
 
 int main(int argc, char **argv)
 {
-    if (core_init(argc, argv) != 0) {
-        loge("core_init() fail: %d\n", errno);
+    if (common_init() != 0) {
+        loge("common_init() fail: %d\n", errno);
         return 0;
     }
 
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     pthread_create(&pid, 0, thread_udp_server, 0);
     pthread_create(&pid, 0, thread_udp_client, 0);
 
-    core_wait_exit();
+    common_wait_exit();
 }
 
 int cmdline_proc(long id, char **param, int num)
@@ -96,11 +96,11 @@ int cmdline_proc(long id, char **param, int num)
 
 void app_proper_exit(int ec)
 {
-    core_stop();
+    common_stop();
     argparser_delete(cmdline);
 }
 
 #ifdef __cplusplus
 }
-#endif 
+#endif
 
