@@ -10,8 +10,8 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 #include <pthread.h>
-#include <errno.h>
 
+#include "err.h"
 #include "mpool.h"
 #include "mux.h"
 
@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-/// 对内存的使用做限制，避免在自增长模式下向系统无限申请内存
+/// 对内存的使用做限制，避免内存池在自增长模式下向系统无限申请内存
 #define THRQ_MAX_SIZE           65536
 
 /**
@@ -66,17 +66,17 @@ typedef struct {
 #define THRQ_BLOCK_SIZE(data_size)      (sizeof(thrq_elm_t) + (data_size))
 
 #define THRQ_INIT(q)                    thrq_init(q,0)
-#define THRQ_INIT_M(q,m)                thrq_init(q,m)
+#define THRQ_INIT_MP(q,m)               thrq_init(q,m)
 
-extern int          thrq_init           (thrq_cb_t *thrq, mpool_t *mp);
-extern thrq_cb_t*   thrq_new            (thrq_cb_t **thrq, mpool_t *mp);
-extern void         thrq_destroy        (thrq_cb_t *thrq);
+extern int          thrq_init(thrq_cb_t *thrq, mpool_t *mp);
+extern thrq_cb_t*   thrq_new(thrq_cb_t **thrq, mpool_t *mp);
+extern void         thrq_destroy(thrq_cb_t *thrq);
 
-extern bool         thrq_empty          (thrq_cb_t *thrq);
-extern int          thrq_count          (thrq_cb_t *thrq);
+extern bool         thrq_empty(thrq_cb_t *thrq);
+extern int          thrq_count(thrq_cb_t *thrq);
 
-extern int          thrq_send           (thrq_cb_t *thrq, void *data, size_t len);
-extern int          thrq_receive        (thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout);
+extern int          thrq_send(thrq_cb_t *thrq, void *data, size_t len);
+extern int          thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout);
 
 #ifdef __cplusplus
 }

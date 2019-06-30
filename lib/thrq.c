@@ -9,9 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
-#include <sys/time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -105,7 +103,7 @@ bool thrq_empty(thrq_cb_t *thrq)
  * @brief   队列元素个数（或者有多少块数据）
  * @param   thrq    线程队列指针
  * @return  返回队列元素个数
- **/
+ */
 int thrq_count(thrq_cb_t *thrq)
 {
     mux_lock(&thrq->lock);
@@ -196,8 +194,8 @@ void thrq_destroy(thrq_cb_t *thrq)
             thrq_remove(thrq, THRQ_FIRST(thrq));
         }
         thrq->mpool = NULL;
-
         mux_unlock(&thrq->lock);
+
         mux_destroy(&thrq->lock);
     }
 }
@@ -205,8 +203,8 @@ void thrq_destroy(thrq_cb_t *thrq)
 /**
  * @brief   发送队列消息，无阻塞（要么成功，要么立即返回失败）
  * @param   thrq    线程队列指针
- *          data    插入的数据指针
- *          len     插入的数据长度
+ *          data    发送的数据指针
+ *          len     发送的数据长度
  *
  * @return  成功返回0，失败返回-1并设置errno
  */
@@ -238,9 +236,15 @@ int thrq_send(thrq_cb_t *thrq, void *data, size_t len)
  *          通过检查errno是否为 ETIMEDOUT 可以判断函数是否是超时返回
  * @par     举例：
  * @code
- * size_t num; double tout = 3.0;
- * if ((num = thrq_receive(thrq, buf, bufsize, tout)) == -1) {
- *     if (errno == ETIMEDOUT) printf("receive timeout %.1fs\n", tout);
+ * int num;
+ * double tout = 3.0;
+ * for (;;) {
+ *     if ((num = thrq_receive(thrq, buf, bufsize, tout)) == -1) {
+ *         if (errno == ETIMEDOUT) {
+ *             printf("receive timeout %.1fs\n", tout);
+ *             continue;
+ *         }
+ *     }
  * }
  * @endcode
  */
