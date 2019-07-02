@@ -1,23 +1,8 @@
-/* sha256b.c  Implements SHA2-256 algorithm
- *
- * Copyright (c) 2018 by Adequate Systems, LLC.  All Rights Reserved.
- * See LICENSE.PDF   **** NO WARRANTY ****
- *
- * sha256.c is based on public domain code by Brad Conte
- * (brad AT bradconte.com).
- * https://raw.githubusercontent.com/B-Con/crypto-algorithms/master/sha256.c
- *
- * Algorithm specification can be found here:
- * http://csrc.nist.gov/publications/fips/fips180-2/fips180-2withchangenotice.pdf
- * This implementation uses little endian byte order.
- *
- * Date: 5 January 2018
- *
-*/
-
 #include <stdlib.h>
 #include <string.h>
 #include "sha256.h"
+
+#ifndef USE_OPENSSL
 
 /* LOCAL MACROS */
 #define ROTLEFT(a,b)    (((a) << (b)) | ((a) >> (32-(b))))
@@ -32,36 +17,29 @@
 
 /**************************** VARIABLES *****************************/
 static const word32 k[64] = {
-    0x428a2f98L,0x71374491L,0xb5c0fbcfL,0xe9b5dba5L,0x3956c25bL,0x59f111f1L,
-    0x923f82a4L,0xab1c5ed5L,
-    0xd807aa98L,0x12835b01L,0x243185beL,0x550c7dc3L,0x72be5d74L,0x80deb1feL,
-    0x9bdc06a7L,0xc19bf174L,
-    0xe49b69c1L,0xefbe4786L,0x0fc19dc6L,0x240ca1ccL,0x2de92c6fL,0x4a7484aaL,
-    0x5cb0a9dcL,0x76f988daL,
-    0x983e5152L,0xa831c66dL,0xb00327c8L,0xbf597fc7L,0xc6e00bf3L,0xd5a79147L,
-    0x06ca6351L,0x14292967L,
-    0x27b70a85L,0x2e1b2138L,0x4d2c6dfcL,0x53380d13L,0x650a7354L,0x766a0abbL,
-    0x81c2c92eL,0x92722c85L,
-    0xa2bfe8a1L,0xa81a664bL,0xc24b8b70L,0xc76c51a3L,0xd192e819L,0xd6990624L,
-    0xf40e3585L,0x106aa070L,
-    0x19a4c116L,0x1e376c08L,0x2748774cL,0x34b0bcb5L,0x391c0cb3L,0x4ed8aa4aL,
-    0x5b9cca4fL,0x682e6ff3L,
-    0x748f82eeL,0x78a5636fL,0x84c87814L,0x8cc70208L,0x90befffaL,0xa4506cebL,
-    0xbef9a3f7L,0xc67178f2L
+    0x428a2f98L,0x71374491L,0xb5c0fbcfL,0xe9b5dba5L,0x3956c25bL,0x59f111f1L,0x923f82a4L,0xab1c5ed5L,
+    0xd807aa98L,0x12835b01L,0x243185beL,0x550c7dc3L,0x72be5d74L,0x80deb1feL,0x9bdc06a7L,0xc19bf174L,
+    0xe49b69c1L,0xefbe4786L,0x0fc19dc6L,0x240ca1ccL,0x2de92c6fL,0x4a7484aaL,0x5cb0a9dcL,0x76f988daL,
+    0x983e5152L,0xa831c66dL,0xb00327c8L,0xbf597fc7L,0xc6e00bf3L,0xd5a79147L,0x06ca6351L,0x14292967L,
+    0x27b70a85L,0x2e1b2138L,0x4d2c6dfcL,0x53380d13L,0x650a7354L,0x766a0abbL,0x81c2c92eL,0x92722c85L,
+    0xa2bfe8a1L,0xa81a664bL,0xc24b8b70L,0xc76c51a3L,0xd192e819L,0xd6990624L,0xf40e3585L,0x106aa070L,
+    0x19a4c116L,0x1e376c08L,0x2748774cL,0x34b0bcb5L,0x391c0cb3L,0x4ed8aa4aL,0x5b9cca4fL,0x682e6ff3L,
+    0x748f82eeL,0x78a5636fL,0x84c87814L,0x8cc70208L,0x90befffaL,0xa4506cebL,0xbef9a3f7L,0xc67178f2L
 };
 
 
-void sha256_transform(SHA256_CTX *ctx, const byte data[])
+void SHA256_Transform(SHA256_CTX *ctx, const byte data[])
 {
     word32 a, b, c, d, e, f, g, h, t1, t2, m[64];
     int i, j;
 
-    for(i = j = 0; i < 16; ++i, j += 4)
+    for(i = j = 0; i < 16; ++i, j += 4) {
         m[i] = ((word32) data[j] << 24) | ((word32) data[j + 1] << 16)
-            | ((word32) data[j + 2] << 8) | ((word32) data[j + 3]);
-    for( ; i < 64; ++i)
+                | ((word32) data[j + 2] << 8) | ((word32) data[j + 3]);
+    }
+    for( ; i < 64; ++i) {
         m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
-
+    }
     a = ctx->state[0];
     b = ctx->state[1];
     c = ctx->state[2];
@@ -95,14 +73,11 @@ void sha256_transform(SHA256_CTX *ctx, const byte data[])
 }
 
 
-void sha256_init(SHA256_CTX *ctx)
+void SHA256_Init(SHA256_CTX *ctx)
 {
     ctx->datalen = 0;
-#ifdef LONG64
-    ctx->bitlen = 0;
-#else
     ctx->bitlen = ctx->bitlen2 = 0;
-#endif
+
     ctx->state[0] = 0x6a09e667L;
     ctx->state[1] = 0xbb67ae85L;
     ctx->state[2] = 0x3c6ef372L;
@@ -115,7 +90,7 @@ void sha256_init(SHA256_CTX *ctx)
 
 
 /* data[] is less than 64k bytes in length on 16-bit machines. */
-void sha256_update(SHA256_CTX *ctx, const byte data[], unsigned len)
+void SHA256_Update(SHA256_CTX *ctx, const byte* data, size_t len)
 {
     unsigned i;
     word32 old;
@@ -124,22 +99,18 @@ void sha256_update(SHA256_CTX *ctx, const byte data[], unsigned len)
         ctx->data[ctx->datalen] = data[i];
         ctx->datalen++;
         if(ctx->datalen == 64) {
-            sha256_transform(ctx, ctx->data);
-#ifdef LONG64
-            ctx->bitlen += 512;
-#else
+            SHA256_Transform(ctx, ctx->data);
             old = ctx->bitlen;
             ctx->bitlen += 512;
             if(ctx->bitlen < old) 
                 ctx->bitlen2++;  /* add in carry */
-#endif
             ctx->datalen = 0;
         }
     }
 }
 
 
-void sha256_final(SHA256_CTX *ctx, byte hash[])
+void SHA256_Final(byte* hash, SHA256_CTX *ctx)
 {
     unsigned i, j;
     word32 old;
@@ -155,33 +126,22 @@ void sha256_final(SHA256_CTX *ctx, byte hash[])
         ctx->data[i++] = 0x80;
         while(i < 64)
             ctx->data[i++] = 0x00;
-        sha256_transform(ctx, ctx->data);
+        SHA256_Transform(ctx, ctx->data);
         memset(ctx->data, 0, 56);
     }
 
-#ifdef LONG64
-    ctx->bitlen += ctx->datalen * 8;
-#else
     old = ctx->bitlen;
     ctx->bitlen += ctx->datalen * 8;
     if(ctx->bitlen < old) ctx->bitlen2++;  /* add in carry */
-#endif
     ctx->data[63] = ctx->bitlen;
     ctx->data[62] = ctx->bitlen >> 8;
     ctx->data[61] = ctx->bitlen >> 16;
     ctx->data[60] = ctx->bitlen >> 24;
-#ifndef LONG64
     ctx->data[59] = ctx->bitlen2;
     ctx->data[58] = ctx->bitlen2 >> 8;
     ctx->data[57] = ctx->bitlen2 >> 16;
     ctx->data[56] = ctx->bitlen2 >> 24;
-#else
-    ctx->data[59] = ctx->bitlen >> 32;  /* on 64-bit machines */
-    ctx->data[58] = ctx->bitlen >> 40;
-    ctx->data[57] = ctx->bitlen >> 48;
-    ctx->data[56] = ctx->bitlen >> 56;
-#endif
-    sha256_transform(ctx, ctx->data);
+    SHA256_Transform(ctx, ctx->data);
 
     /* Since this implementation uses little endian byte ordering and 
      * SHA uses big endian, reverse all the bytes when copying the final
@@ -200,13 +160,13 @@ void sha256_final(SHA256_CTX *ctx, byte hash[])
     memset(ctx, 0, sizeof(SHA256_CTX));  /* security */
 }
 
+#endif 
 
 void sha256(const void *in, int inlen, void *hashout)
 {
     SHA256_CTX ctx;
-
-    sha256_init(&ctx);
-    sha256_update(&ctx, (byte *)in, inlen);
-    sha256_final(&ctx, (byte *)hashout);
+    SHA256_Init(&ctx);
+    SHA256_Update(&ctx, (const unsigned char *)in, inlen);
+    SHA256_Final((unsigned char *)hashout, &ctx);
 }
 

@@ -8,6 +8,7 @@ aux_source_directory(argparser DIR_MOD_SRCS)
 
 link_libraries(pthread)
 link_libraries(curl)
+link_libraries(crypto)
 link_libraries(m)
 
 add_definitions("-DDEBUG")

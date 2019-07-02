@@ -35,7 +35,7 @@ unsigned int rnd_gen_seed(const void *seed, size_t len, char *file)
     if (buf) {
         memcpy(buf, seed, len);
         memcpy(buf, &tms, sizeof(struct timespec));
-        FILE *fp = fopen(file, "r");
+        FILE *fp = fopen(file, "rb");
         if (fp) {
             fread(buf + len + sizeof(struct timespec), 1, file_size, fp);
             fclose(fp);

@@ -1,29 +1,11 @@
-/* sha256.h  Application header for SHA2-256 algorithm
- *
- * Copyright (c) 2018 by Adequate Systems, LLC.  All Rights Reserved.
- * See LICENSE.PDF   **** NO WARRANTY ****
- *
- * sha256.h is based on public domain code by Brad Conte
- * (brad AT bradconte.com).
- * https://raw.githubusercontent.com/B-Con/crypto-algorithms/master/sha256.h
- *
- * NOTE: Max message size is 512M on machines without LONG64 defined.
- *       Compile with LONG64 defined if you have a 64-bit long.
- *
- * Date: 5 January 2018
- *
-*/
-
 #ifndef __SHA256_H__
 #define __SHA256_H__
 
 #include <stddef.h>
 
-//#define LONG64 
+#define USE_OPENSSL
 
-//#ifdef LONG64
-//typedef unsigned long word64;
-//#endif
+#ifndef USE_OPENSSL
 
 #ifndef WORD32
 #define WORD32
@@ -38,18 +20,21 @@ typedef struct {
     byte data[64];
     unsigned datalen;
     unsigned long bitlen;
-#ifndef LONG64
     unsigned long bitlen2;
-#endif
     word32 state[8];
 } SHA256_CTX;
 
 #define SHA256_BLOCK_SIZE 32     /* SHA256 outputs a byte hash[32] digest */
 
 /* Prototypes */
-void sha256_init(SHA256_CTX *ctx);
-void sha256_update(SHA256_CTX *ctx, const byte data[], unsigned len);
-void sha256_final(SHA256_CTX *ctx, byte hash[]);  /* hash is 32 bytes */
+void SHA256_Init(SHA256_CTX *ctx);
+void SHA256_Update(SHA256_CTX *ctx, const byte* data, size_t len);
+void SHA256_Final(byte *hash, SHA256_CTX *ctx);  /* hash is 32 bytes */
+
+#else
+#include <openssl/sha.h>
+#endif 
+
 void sha256(const void *in, int inlen, void *hashout);
 
 #endif   /* SHA256_H */
