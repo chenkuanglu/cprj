@@ -26,6 +26,7 @@ extern mux_t*   mux_new(mux_t **mux);
 extern void     mux_destroy(mux_t *mux);
 
 extern int      mux_lock(mux_t *mux);
+extern int      mux_trylock(mux_t *mux);
 extern int      mux_unlock(mux_t *mux);
 
 #ifdef __cplusplus

@@ -84,7 +84,7 @@ int common_wait_exit(void)
     cinfo.tid_start = pthread_self();
 
     for (;;) {
-        if (thrq_receive(&cinfo.thrq_start, &ec, sizeof(ec), 0) < 0) {
+        if (thrq_receive(&cinfo.thrq_start, &ec, sizeof(ec), 0, 0) < 0) {
             loge("common_wait_exit() fail: %s\n", err_string(errno, ebuf, sizeof(ebuf)));
             nsleep(0.1);
             continue;
@@ -106,7 +106,7 @@ int common_wait_exit(void)
  */
 void common_exit(int ec)
 {
-    thrq_send(&cinfo.thrq_start, &ec, sizeof(ec));
+    thrq_send(&cinfo.thrq_start, &ec, sizeof(ec), 0);
     COMMON_RETIRE();
 }
 

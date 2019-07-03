@@ -109,7 +109,26 @@ void mux_destroy(mux_t *mux)
  */
 int mux_lock(mux_t *mux)
 {
+    if (mux == NULL) {
+        return EINVAL;
+    }
     return pthread_mutex_lock(&mux->mux);
+}
+
+/**
+ * @brief   尝试加锁互斥锁，如果mux被其他线程占用则立即返回EBUSY
+ *
+ * @param   mux     互斥锁指针
+ *
+ * @retval  0   成功
+ * @retval  !0  错误码
+ */
+int mux_trylock(mux_t *mux)
+{
+    if (mux == NULL) {
+        return EINVAL;
+    }
+    return pthread_mutex_trylock(&mux->mux);
 }
 
 /**
@@ -122,9 +141,13 @@ int mux_lock(mux_t *mux)
  */
 int mux_unlock(mux_t *mux)
 {
+    if (mux == NULL) {
+        return EINVAL;
+    }
     return pthread_mutex_unlock(&mux->mux);
 }
 
 #ifdef __cplusplus
 }
 #endif
+

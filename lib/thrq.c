@@ -205,12 +205,27 @@ void thrq_destroy(thrq_cb_t *thrq)
  * @param   thrq    线程队列指针
  *          data    发送的数据指针
  *          len     发送的数据长度
+ *          flags   阻塞标志：0表示阻塞，THRQ_NOWAIT表示不阻塞（阻塞是指在加锁时锁被其他线程占用）
  *
  * @return  成功返回0，失败返回-1并设置errno
  */
-int thrq_send(thrq_cb_t *thrq, void *data, size_t len)
+int thrq_send(thrq_cb_t *thrq, void *data, size_t len, int flags)
 {
-    mux_lock(&thrq->lock);
+    if (thrq == NULL || data == NULL || len == 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    int res;
+    if (flags == THRQ_NOWAIT) {
+        if ((res = mux_trylock(&thrq->lock)) == EBUSY) {
+            errno = res;
+            return -1;
+        }
+    } else {
+        mux_lock(&thrq->lock);
+    }
+
     if (thrq_insert_tail(thrq, data, len) != 0) {
         mux_unlock(&thrq->lock);
         return -1;
@@ -218,8 +233,8 @@ int thrq_send(thrq_cb_t *thrq, void *data, size_t len)
     if (pthread_cond_signal(&thrq->cond) != 0) {
         return -1;
     }
+    
     mux_unlock(&thrq->lock);
-
     return 0;
 }
 
@@ -229,6 +244,7 @@ int thrq_send(thrq_cb_t *thrq, void *data, size_t len)
  *          buf         接收缓存
  *          max_size    接收缓存的大小
  *          timeout     接收超时，单位为秒，0表示一直阻塞直到收到数据为止
+ *          flags       阻塞标志：0表示阻塞，THRQ_NOWAIT表示不阻塞(即锁被占用或者无数据时立即返回)
  *
  * @return  成功返回实际收到的数据长度,失败返回-1并设置错误码
  *
@@ -248,11 +264,15 @@ int thrq_send(thrq_cb_t *thrq, void *data, size_t len)
  * }
  * @endcode
  */
-int thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout)
+int thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout, int flags)
 {
+    if (thrq == NULL || buf == NULL || bufsize == 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
     int res = 0;
     struct timespec ts;
-
     if (timeout > 0) {
         clock_gettime(CLOCK_MONOTONIC, &ts);
         // ok, max_long_int = 2.1s > (1s + 1s)
@@ -261,20 +281,36 @@ int thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout)
         ts.tv_nsec = ts.tv_nsec % 1000000000L;
     }
 
-    mux_lock(&thrq->lock);
-
-    /* break when error occured or data receive */
-    while (res == 0 && thrq->count == 0) {
-        if (timeout > 0) {
-            res = pthread_cond_timedwait(&thrq->cond, &thrq->lock.mux, &ts);
-        } else {
-            res = pthread_cond_wait(&thrq->cond, &thrq->lock.mux);
+    int lock_res;
+    if (flags == THRQ_NOWAIT) {
+        if ((lock_res = mux_trylock(&thrq->lock)) == EBUSY) {
+            errno = lock_res;
+            return -1;
         }
+    } else {
+        mux_lock(&thrq->lock);
     }
-    if (res != 0) {
-        mux_unlock(&thrq->lock);
-        errno = res;
-        return -1;      // errno may be the ETIMEDOUT
+
+    if (flags != THRQ_NOWAIT) {
+        /* break when error occured or data receive */
+        while (res == 0 && thrq->count == 0) {
+            if (timeout > 0) {
+                res = pthread_cond_timedwait(&thrq->cond, &thrq->lock.mux, &ts);
+            } else {
+                res = pthread_cond_wait(&thrq->cond, &thrq->lock.mux);
+            }
+        }
+        if (res != 0) {
+            mux_unlock(&thrq->lock);
+            errno = res;
+            return -1;      // errno may be the ETIMEDOUT
+        }
+    } else {
+        if (thrq->count == 0) {
+            errno = LIB_ERRNO_QUE_EMPTY;
+            mux_unlock(&thrq->lock);
+            return -1;
+        }
     }
 
     thrq_elm_t *elm = THRQ_FIRST(thrq);

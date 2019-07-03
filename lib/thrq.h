@@ -68,6 +68,8 @@ typedef struct {
 #define THRQ_INIT(q)                    thrq_init(q,0)
 #define THRQ_INIT_MP(q,m)               thrq_init(q,m)
 
+#define THRQ_NOWAIT                     1
+
 extern int          thrq_init(thrq_cb_t *thrq, mpool_t *mp);
 extern thrq_cb_t*   thrq_new(thrq_cb_t **thrq, mpool_t *mp);
 extern void         thrq_destroy(thrq_cb_t *thrq);
@@ -75,8 +77,8 @@ extern void         thrq_destroy(thrq_cb_t *thrq);
 extern bool         thrq_empty(thrq_cb_t *thrq);
 extern int          thrq_count(thrq_cb_t *thrq);
 
-extern int          thrq_send(thrq_cb_t *thrq, void *data, size_t len);
-extern int          thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout);
+extern int          thrq_send(thrq_cb_t *thrq, void *data, size_t len, int flags);
+extern int          thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout, int flags);
 
 #ifdef __cplusplus
 }
