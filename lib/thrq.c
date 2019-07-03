@@ -255,7 +255,7 @@ int thrq_send(thrq_cb_t *thrq, void *data, size_t len, int flags)
  * int num;
  * double tout = 3.0;
  * for (;;) {
- *     if ((num = thrq_receive(thrq, buf, bufsize, tout)) == -1) {
+ *     if ((num = thrq_receive(thrq, buf, bufsize, tout, 0)) == -1) {
  *         if (errno == ETIMEDOUT) {
  *             printf("receive timeout %.1fs\n", tout);
  *             continue;
