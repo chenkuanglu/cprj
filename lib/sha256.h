@@ -1,19 +1,23 @@
-#ifndef __SHA256_H__
-#define __SHA256_H__
+/**
+ * @file    sha256.h
+ * @author  ln
+ * @brief   sha256 hash
+ */
+
+#ifndef __SHA256_X_H__
+#define __SHA256_X_H__
 
 #include <stddef.h>
-
 #define USE_OPENSSL
 
 #ifndef USE_OPENSSL
-
 #ifndef WORD32
 #define WORD32
 typedef unsigned char byte;      /* 8-bit byte */
 typedef unsigned short word16;   /* 16-bit word */
 typedef unsigned int word32;     /* 32-bit word  */
-/* for 16-bit machines: */
-/* typedef unsigned long word32;  */
+// for 16-bit machines:
+// typedef unsigned long word32;
 #endif  /* WORD32 */
 
 typedef struct {
@@ -30,10 +34,9 @@ typedef struct {
 void SHA256_Init(SHA256_CTX *ctx);
 void SHA256_Update(SHA256_CTX *ctx, const byte* data, size_t len);
 void SHA256_Final(byte *hash, SHA256_CTX *ctx);  /* hash is 32 bytes */
-
 #else
 #include <openssl/sha.h>
-#endif 
+#endif  /* USE_OPENSSL */
 
 void sha256(void *hashout, const void *in, size_t inlen);
 

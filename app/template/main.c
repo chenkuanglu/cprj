@@ -7,6 +7,8 @@
  **/
 
 #include "../../common/common.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,16 +23,17 @@ void* thread_udp_server(void *arg)
     const char *sinfo = "server info";
     struct sockaddr_in src_addr;
 
-    int fd = udp_server_open(INADDR_ANY, 5513);
+    int fd = udp_open();
+    udp_bind(fd, INADDR_ANY, 5513);
     for (;;) {
         if (udp_read(fd, buf, sizeof(buf), 0, &src_addr) < 0) {
             loge("socket recv fail: %s", strerror(errno));
             nsleep(0.1);
             continue;
         }
-        logw("server read from '%s:%d': %s\n", inet_ntoa(GET_SOCKADDR(src_addr)), GET_SOCKPORT(src_addr), (char*)buf);
+        logw("server read from '%s:%d': %s\n", inet_ntoa(NET_SOCKADDR(src_addr)), NET_SOCKPORT(src_addr), (char*)buf);
 
-        logw("server write to '%s:%d': %s\n", inet_ntoa(GET_SOCKADDR(src_addr)), GET_SOCKPORT(src_addr), (char*)sinfo);
+        logw("server write to '%s:%d': %s\n", inet_ntoa(NET_SOCKADDR(src_addr)), NET_SOCKPORT(src_addr), (char*)sinfo);
         udp_write(fd, sinfo, strlen(sinfo), 0, &src_addr);
     }
 }
@@ -41,12 +44,11 @@ void* thread_udp_client(void *arg)
     const char *online = "CNMT online";
     struct sockaddr_in src_addr;
     struct sockaddr_in dst_addr;
-    set_sockaddr(&dst_addr, INADDR_BROADCAST, 5513);
+    net_setsaddr(&dst_addr, INADDR_BROADCAST, 5513);
 
-    int fd = udp_client_open();
-
+    int fd = udp_open();
     for (;;) {
-        logi("client write to  '%s:%d': %s\n", inet_ntoa(GET_SOCKADDR(dst_addr)), GET_SOCKPORT(dst_addr), online);
+        logi("client write to  '%s:%d': %s\n", inet_ntoa(NET_SOCKADDR(dst_addr)), NET_SOCKPORT(dst_addr), online);
         if (udp_write(fd, online, strlen(online), 0, &dst_addr) < 0) {
             loge("client send fail: %s", strerror(errno));
         }
@@ -54,7 +56,7 @@ void* thread_udp_client(void *arg)
         if (udp_read(fd, buf, sizeof(buf), 0, &src_addr) < 0) {
             loge("client read fail: %s", strerror(errno));
         }
-        logi("client read from '%s:%d': %s\n\n", inet_ntoa(GET_SOCKADDR(src_addr)), GET_SOCKPORT(src_addr), (char*)buf);
+        logi("client read from '%s:%d': %s\n\n", inet_ntoa(NET_SOCKADDR(src_addr)), NET_SOCKPORT(src_addr), (char*)buf);
 
         nsleep(1.0);
     }

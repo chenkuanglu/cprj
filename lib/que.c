@@ -55,13 +55,16 @@ que_cb_t* que_new(que_cb_t **que, mpool_t *mp)
 }
 
 /**
- * @brief   队列是否为空
+ * @brief   队列是否为空，如果参数是NULL则“队列”始终为”空“
  * @param   thrq    队列指针
  * @retval  true    队列空
  * @retval  false   队列不空
  */
 bool que_empty(que_cb_t *que)
 {
+    if (que == NULL) {
+        return true;
+    }
     mux_lock(&que->lock);
     int empty = QUE_EMPTY(que);
     mux_unlock(&que->lock);
@@ -72,10 +75,13 @@ bool que_empty(que_cb_t *que)
 /**
  * @brief   队列元素个数（或者有多少块数据）
  * @param   thrq    队列指针
- * @return  返回队列元素个数
+ * @return  返回队列元素个数，如果参数为NULL，则返回0
  */
 int que_count(que_cb_t *que)
 {
+    if (que == NULL) {
+        return 0;
+    }
     mux_lock(&que->lock);
     int count = que->count;
     mux_unlock(&que->lock);

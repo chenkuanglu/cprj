@@ -16,6 +16,9 @@
 #include "../timer/timer.h"
 #include "../argparser/argparser.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

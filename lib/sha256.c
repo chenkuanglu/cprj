@@ -1,3 +1,9 @@
+/**
+ * @file    sha256.c
+ * @author  ln
+ * @brief   sha256 hash
+ */
+ 
 #include <stdlib.h>
 #include <string.h>
 #include "sha256.h"
@@ -15,7 +21,7 @@
 #define SIG0(x)         (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
 #define SIG1(x)         (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
 
-/**************************** VARIABLES *****************************/
+/* VARIABLES */
 static const word32 k[64] = {
     0x428a2f98L,0x71374491L,0xb5c0fbcfL,0xe9b5dba5L,0x3956c25bL,0x59f111f1L,0x923f82a4L,0xab1c5ed5L,
     0xd807aa98L,0x12835b01L,0x243185beL,0x550c7dc3L,0x72be5d74L,0x80deb1feL,0x9bdc06a7L,0xc19bf174L,
@@ -160,13 +166,25 @@ void SHA256_Final(byte* hash, SHA256_CTX *ctx)
     memset(ctx, 0, sizeof(SHA256_CTX));  /* security */
 }
 
-#endif 
+#endif  /* USE_OPENSSL */
 
+
+/**
+ * @brief   sha256 hash
+ *
+ * @param   hashout 32字节输出buf
+ *          in      输入数据
+ *          inlen   输入数据的长度
+ *
+ * @return  void
+ */
 void sha256(void *hashout, const void *in, size_t inlen)
 {
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, (const unsigned char *)in, inlen);
-    SHA256_Final((unsigned char *)hashout, &ctx);
+    if (hashout && in && inlen) {
+        SHA256_CTX ctx;
+        SHA256_Init(&ctx);
+        SHA256_Update(&ctx, (const unsigned char *)in, inlen);
+        SHA256_Final((unsigned char *)hashout, &ctx);
+    }
 }
 

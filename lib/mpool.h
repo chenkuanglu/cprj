@@ -52,6 +52,8 @@ typedef struct __mpool {
 #define MPOOL_BLOCK_NUM_ALLOC           256
 /// 块大小（块的表头 + 块的有效数据）
 #define MPOOL_BLOCK_SIZE(data_size)     (sizeof(mpool_elm_t) + data_size)
+/// 长度按int对齐
+#define MPOOL_ALIGN_SIZE(len)           ((len) ? ((((len)-1) / sizeof(int)) + 1) * sizeof(int) : 0)
 
 #define MPOOL_INIT_MALLOC(mpl)          mpool_init(mpl,0,0,0)
 #define MPOOL_INIT(mpl)                 MPOOL_INIT_MALLOC(mpl)

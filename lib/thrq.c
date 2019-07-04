@@ -105,13 +105,12 @@ bool thrq_empty(thrq_cb_t *thrq)
 /**
  * @brief   队列元素个数（或者有多少块数据）
  * @param   thrq    线程队列指针
- * @return  返回队列元素个数
+ * @return  返回队列元素个数，如果参数为NULL，则返回0
  */
 int thrq_count(thrq_cb_t *thrq)
 {
     if (thrq == NULL) {
-        errno = EINVAL;
-        return -1;
+        return 0;
     }
     mux_lock(&thrq->lock);
     int count = thrq->count;

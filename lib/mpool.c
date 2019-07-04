@@ -70,11 +70,7 @@ int mpool_init(mpool_t *mpool, size_t data_size, size_t n, void *ebuf)
         mpool->mode = MPOOL_MODE_MALLOC;
     } else {
         size_t ebuf_size = data_size * n;
-
-        // sizeof(int) align
-        int align = data_size % sizeof(int);
-        if (align)
-            data_size += sizeof(int) - align;
+        data_size = MPOOL_ALIGN_SIZE(data_size);
 
         if (n == 0) {
             mpool->mode = MPOOL_MODE_DGROWN;
