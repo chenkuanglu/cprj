@@ -162,7 +162,7 @@ void SHA256_Final(byte* hash, SHA256_CTX *ctx)
 
 #endif 
 
-void sha256(const void *in, int inlen, void *hashout)
+void sha256(void *hashout, const void *in, size_t inlen)
 {
     SHA256_CTX ctx;
     SHA256_Init(&ctx);

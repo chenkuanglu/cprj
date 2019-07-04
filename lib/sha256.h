@@ -35,7 +35,7 @@ void SHA256_Final(byte *hash, SHA256_CTX *ctx);  /* hash is 32 bytes */
 #include <openssl/sha.h>
 #endif 
 
-void sha256(const void *in, int inlen, void *hashout);
+void sha256(void *hashout, const void *in, size_t inlen);
 
 #endif   /* SHA256_H */
 

@@ -85,3 +85,4 @@ extern int          thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, dou
 #endif
 
 #endif /* __THR_QUEUE__ */
+

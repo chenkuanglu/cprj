@@ -64,7 +64,7 @@ int thrq_init(thrq_cb_t *thrq, mpool_t *mp)
  * 或者
  * @code
  * thrq_cb_t *thrq = NULL;
- * thrq_new(&thrq, NULL);
+ * thrq_new(&thrq, NULL);   // thrq will not be NULL if success
  * @endcode
  *
  * @attention 返回的thrq对象需要free
@@ -86,13 +86,16 @@ thrq_cb_t* thrq_new(thrq_cb_t **thrq, mpool_t *mp)
 }
 
 /**
- * @brief   队列是否为空
+ * @brief   队列是否为空，如果参数是NULL则“队列”始终为”空“
  * @param   thrq    线程队列指针
  * @retval  true    队列空
  * @retval  false   队列不空
  */
 bool thrq_empty(thrq_cb_t *thrq)
 {
+    if (thrq == NULL) {
+        return true;
+    }
     mux_lock(&thrq->lock);
     bool empty = THRQ_EMPTY(thrq);
     mux_unlock(&thrq->lock);
@@ -106,6 +109,10 @@ bool thrq_empty(thrq_cb_t *thrq)
  */
 int thrq_count(thrq_cb_t *thrq)
 {
+    if (thrq == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
     mux_lock(&thrq->lock);
     int count = thrq->count;
     mux_unlock(&thrq->lock);
@@ -121,18 +128,21 @@ int thrq_count(thrq_cb_t *thrq)
  */
 static int thrq_remove(thrq_cb_t *thrq, thrq_elm_t *elm)
 {
-    if (thrq != 0 && elm != 0) {
-        mux_lock(&thrq->lock);
-        TAILQ_REMOVE(&thrq->head, elm, entry);
-        if (thrq->mpool)
-            mpool_free(thrq->mpool, elm);
-        else
-            free(elm);
-        if (thrq->count > 0) {
-            thrq->count--;
-        }
-        mux_unlock(&thrq->lock);
+    if (thrq == NULL || elm == NULL) {
+        errno = EINVAL;
+        return -1;
     }
+
+    mux_lock(&thrq->lock);
+    TAILQ_REMOVE(&thrq->head, elm, entry);
+    if (thrq->mpool)
+        mpool_free(thrq->mpool, elm);
+    else
+        free(elm);
+    if (thrq->count > 0) {
+        thrq->count--;
+    }
+    mux_unlock(&thrq->lock);
     return 0;
 }
 
@@ -201,7 +211,7 @@ void thrq_destroy(thrq_cb_t *thrq)
 }
 
 /**
- * @brief   发送队列消息，无阻塞（要么成功，要么立即返回失败）
+ * @brief   以阻塞或非阻塞方式发送队列消息
  * @param   thrq    线程队列指针
  *          data    发送的数据指针
  *          len     发送的数据长度
@@ -216,30 +226,31 @@ int thrq_send(thrq_cb_t *thrq, void *data, size_t len, int flags)
         return -1;
     }
 
-    int res;
+    int lock_res;
     if (flags == THRQ_NOWAIT) {
-        if ((res = mux_trylock(&thrq->lock)) == EBUSY) {
-            errno = res;
+        if ((lock_res = mux_trylock(&thrq->lock)) == EBUSY) {
+            errno = lock_res;
             return -1;
         }
     } else {
         mux_lock(&thrq->lock);
     }
-
     if (thrq_insert_tail(thrq, data, len) != 0) {
         mux_unlock(&thrq->lock);
         return -1;
     }
-    if (pthread_cond_signal(&thrq->cond) != 0) {
+    mux_unlock(&thrq->lock);
+
+    int res;
+    if ((res = pthread_cond_signal(&thrq->cond)) != 0) {
+        errno = res;
         return -1;
     }
-    
-    mux_unlock(&thrq->lock);
     return 0;
 }
 
 /**
- * @brief   接收队列消息，无数据时函数被阻塞
+ * @brief   以阻塞或非阻塞方式接收队列消息
  * @param   thrq        线程队列指针
  *          buf         接收缓存
  *          max_size    接收缓存的大小
@@ -325,3 +336,4 @@ int thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout, int
 #ifdef __cplusplus
 }
 #endif
+
