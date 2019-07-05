@@ -10,6 +10,8 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <sys/poll.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +40,50 @@ int net_setsaddr(struct sockaddr_in *saddr, uint32_t ip, uint16_t port)
 }
 
 /**
+ * @brief   打开socket udp
+ *
+ * @param   snd_bufsize 发送缓存大小
+ * @param   rcv_bufsize 接收缓存大小
+ * @param   noblock     是否不阻塞：0=阻塞，!0=不阻塞
+ *
+ * @return  成功返回打开的fd,失败返回-1并设置errno
+ */
+int udp_open(size_t snd_bufsize, size_t rcv_bufsize, int noblock)
+{
+    int opt_en = 1;
+    int fd_socket = -1;
+
+    if ((fd_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        return -1;
+    }
+    if (setsockopt(fd_socket, SOL_SOCKET, SO_BROADCAST | SO_REUSEADDR, 
+                                    (char *)&opt_en, sizeof(opt_en)) != 0) {
+        close(fd_socket);
+        return -1;
+    }
+
+    if (setsockopt(fd_socket, SOL_SOCKET, SO_SNDBUF, 
+                                    (char *)&snd_bufsize, sizeof(snd_bufsize)) != 0) {
+        close(fd_socket);
+        return -1;
+    }
+    if (setsockopt(fd_socket, SOL_SOCKET, SO_RCVBUF, 
+                                    (char *)&rcv_bufsize, sizeof(rcv_bufsize)) != 0) {
+        close(fd_socket);
+        return -1;
+    }
+
+    if (noblock) {
+        int flags = fcntl(fd_socket, F_GETFL, 0);
+        if (fcntl(fd_socket, F_SETFL, flags | O_NONBLOCK) != 0) {
+            close(fd_socket);
+            return -1;
+        }
+    }
+    return fd_socket;
+}
+
+/**
  * @brief   udp绑定ip和端口号
  *
  * @param   local_ip    要绑定/监听的ip地址    
@@ -51,26 +97,6 @@ int udp_bind(int fd_socket, uint32_t local_ip, uint16_t local_port)
     const socklen_t slen = sizeof(struct sockaddr_in);
     net_setsaddr(&addr_listen, local_ip, local_port);
 	if (bind(fd_socket, (struct sockaddr *)&addr_listen, slen) == -1) {
-        close(fd_socket);
-        return -1;
-    }
-    return fd_socket;
-}
-
-/**
- * @brief   打开socket udp
- * @return  成功返回打开的fd,失败返回-1并设置errno
- */
-int udp_open(void)
-{
-    int opt_en = 1;
-    int fd_socket = -1;
-
-    if ((fd_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-        return -1;
-    }
-    if (setsockopt(fd_socket, SOL_SOCKET, SO_BROADCAST | SO_REUSEADDR, 
-                                    (char *)&opt_en, sizeof(opt_en)) != 0) {
         close(fd_socket);
         return -1;
     }
@@ -111,8 +137,24 @@ int udp_read(int fd, void *buf, size_t len, int flags, struct sockaddr_in *src_a
  */
 int udp_write(int fd, const void *buf, size_t len, int flags, const struct sockaddr_in *dst_addr)
 {
-    socklen_t addrlen = sizeof(struct sockaddr_in);
-    return sendto(fd, buf, len, flags, (const struct sockaddr *)dst_addr, addrlen);
+    struct pollfd fds[1];
+    int nfds = 1;
+    int timeout = 3*1000;   //3s
+    memset(fds, 0, sizeof(fds));
+    fds[0].fd = fd;
+    fds[0].events = POLLOUT;
+
+    for (;;) {
+        int rc = poll(fds, nfds, timeout);
+        if (rc == -1) {         // error
+            return -1;
+        } else if (rc == 0) {   // timeout
+            continue;
+        } else {                // fd is ready for writting
+            socklen_t addrlen = sizeof(struct sockaddr_in);
+            return sendto(fd, buf, len, flags, (const struct sockaddr *)dst_addr, addrlen);
+        }
+    }
 }
 
 #ifdef __cplusplus

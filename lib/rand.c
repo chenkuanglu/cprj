@@ -100,7 +100,7 @@ int rnd_srandom(unsigned int seed, rnd_buf_t *buf)
  * @param   buf     已经由rnd_srandom初始化过的buffer
  *          result  输出随机值
  *
- * @attention   成功返回0，失败返回-1并设置errno
+ * @return  成功返回0，失败返回-1并设置errno
  * @code
  * unsigned int seed = rnd_genseed(&ip, sizeof(ip), NULL);
  * rnd_buf_t buf;

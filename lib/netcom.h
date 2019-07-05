@@ -22,7 +22,7 @@ extern "C" {
 
 extern int net_setsaddr(struct sockaddr_in *saddr, uint32_t ip, uint16_t port);
 
-extern int udp_open(void);
+extern int udp_open(size_t snd_bufsize, size_t rcv_bufsize, int noblock);
 extern int udp_bind(int fd_socket, uint32_t local_ip, uint16_t local_port);
 
 extern int udp_read(int fd, void *buf, size_t len, int flags, struct sockaddr_in *src_addr);
