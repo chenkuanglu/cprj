@@ -98,9 +98,9 @@ char* err_string(int errnum, char *buf, size_t size)
             strncpy(buf, errtbl[ix], size);
         } else {
             snprintf(buf, size, "%s: %d", unknown_str, errnum);
-        }
-        buf[size-1] = '\0';
+        }       
     }
+    buf[size-1] = '\0';
     return buf;
 }
 

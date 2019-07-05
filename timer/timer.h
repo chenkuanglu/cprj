@@ -61,7 +61,7 @@ extern pthread_t tid_stdtmr;
 /// 停止标准定时器
 #define TMR_STOP()                  tmr_destroy(&stdtmr);
 
-/// 向标准定时器注册一个定时事件，参数分别是：时间ID、类型、定时时间、回调函数和参数
+/// 向标准定时器注册一个定时事件，参数分别是：事件ID、类型、定时时间、回调函数和参数
 #define TMR_ADD(id, t, d, fn, arg)  tmr_add(&stdtmr, id, t, d, fn, arg)
 /// 从标准定时器取消一个定时事件，需要指定事件ID
 #define TMR_REMOVE(id)              tmr_remove(&stdtmr, id)

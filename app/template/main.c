@@ -1,12 +1,13 @@
 /**
  * @file    main.c
  * @author  ln
- * @brief   main function
+ * @brief   app 模板工程
  *
- * run: build/app/testlib/testlib --aaa 1 --bbb 1 0x12 3
- **/
+ * run: build/app/template/template --opt1 a1 --opt2 b2 c3
+ */
 
 #include "../../common/common.h"
+#include "user_app.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -14,83 +15,60 @@
 extern "C" {
 #endif
 
-argparser_t *cmdline;
+const char *program_name = MAKE_CSTR(PROGRAM_NAME);
+argparser_t *cmdl_psr = NULL;
 int cmdline_proc(long id, char **param, int num);
 
-void* thread_udp_server(void *arg)
-{
-    char buf[100] = {0};
-    const char *sinfo = "server info";
-    struct sockaddr_in src_addr;
+const char usage[] = "\
+Usage: " MAKE_CSTR(PROGRAM_NAME) " [Options] [Args]\n\
+Options:\n\
+    -v  --version   打印软件版本号\n\
+    -h              打印帮助信息\n\
+";
 
-    int fd = udp_open();
-    udp_bind(fd, INADDR_ANY, 5513);
-    for (;;) {
-        if (udp_read(fd, buf, sizeof(buf), 0, &src_addr) < 0) {
-            loge("socket recv fail: %s", strerror(errno));
-            nsleep(0.1);
-            continue;
-        }
-        logw("server read from '%s:%d': %s\n", inet_ntoa(NET_SOCKADDR(src_addr)), NET_SOCKPORT(src_addr), (char*)buf);
-
-        logw("server write to '%s:%d': %s\n", inet_ntoa(NET_SOCKADDR(src_addr)), NET_SOCKPORT(src_addr), (char*)sinfo);
-        udp_write(fd, sinfo, strlen(sinfo), 0, &src_addr);
-    }
-}
-
-void* thread_udp_client(void *arg)
-{
-    char buf[100] = {0};
-    const char *online = "CNMT online";
-    struct sockaddr_in src_addr;
-    struct sockaddr_in dst_addr;
-    net_setsaddr(&dst_addr, INADDR_BROADCAST, 5513);
-
-    int fd = udp_open();
-    for (;;) {
-        logi("client write to  '%s:%d': %s\n", inet_ntoa(NET_SOCKADDR(dst_addr)), NET_SOCKPORT(dst_addr), online);
-        if (udp_write(fd, online, strlen(online), 0, &dst_addr) < 0) {
-            loge("client send fail: %s", strerror(errno));
-        }
-
-        if (udp_read(fd, buf, sizeof(buf), 0, &src_addr) < 0) {
-            loge("client read fail: %s", strerror(errno));
-        }
-        logi("client read from '%s:%d': %s\n\n", inet_ntoa(NET_SOCKADDR(src_addr)), NET_SOCKPORT(src_addr), (char*)buf);
-
-        nsleep(1.0);
-    }
-}
-
+// app入口函数
 int main(int argc, char **argv)
 {
+    char err_buf[128];
     if (common_init() != 0) {
-        loge("common_init() fail: %d\n", errno);
-        return 0;
+        printf("init fail: %s\n", err_string(errno, err_buf, sizeof(err_buf)));
+        return EXIT_FAILURE;
     }
 
-    cmdline = argparser_new(argc, argv);
-    argparser_add(cmdline, "--aaa", 'a', 1);
-    argparser_add(cmdline, "--bbb", 'b', 2);
-    argparser_parse(cmdline, cmdline_proc);
+    if ((cmdl_psr = argparser_new(argc, argv)) == NULL) {
+        loge("parse fail: %s\n", err_string(errno, err_buf, sizeof(err_buf)));
+        return EXIT_FAILURE;
+    }     
+    argparser_add(cmdl_psr, "--version", 'v', 0);
+    argparser_add(cmdl_psr, "-v", 'v', 0);   
+    argparser_add(cmdl_psr, "-h", 'h', 0);
+    argparser_parse(cmdl_psr, cmdline_proc);
 
-    pthread_t pid;
-    pthread_create(&pid, 0, thread_udp_server, 0);
-    pthread_create(&pid, 0, thread_udp_client, 0);
-
+    logn("%s version %d.%d.%d\n", program_name, 
+                    VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+                  
+    app_init();
+    
     common_wait_exit();
 }
 
+// 命令行参数的处理函数
 int cmdline_proc(long id, char **param, int num)
 {
     switch (id) {
-        case 'a':
-            logi("'id=%c',n=%d,(%d)\n", id, num, strtol(param[0], 0, 0));
+        case 'v':
+            printf("%s version %d.%d.%d\n", program_name, 
+                    VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+            exit(EXIT_SUCCESS);
             break;
-        case 'b':
-            logi("'id=%c',n=%d,(%d %d)\n", id, num, strtol(param[0], 0, 0), strtol(param[1], 0, 0));
+            
+        case 'h':
+            printf("%s\n", usage);
+            exit(EXIT_SUCCESS);
             break;
+            
         default:
+            exit(EXIT_FAILURE);
             break;
     }
     return 0;
@@ -99,7 +77,7 @@ int cmdline_proc(long id, char **param, int num)
 void app_proper_exit(int ec)
 {
     common_stop();
-    argparser_delete(cmdline);
+    argparser_delete(cmdl_psr);
 }
 
 #ifdef __cplusplus

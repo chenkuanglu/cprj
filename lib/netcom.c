@@ -62,12 +62,12 @@ int udp_open(size_t snd_bufsize, size_t rcv_bufsize, int noblock)
         return -1;
     }
 
-    if (setsockopt(fd_socket, SOL_SOCKET, SO_SNDBUF, 
+    if (snd_bufsize && setsockopt(fd_socket, SOL_SOCKET, SO_SNDBUF, 
                                     (char *)&snd_bufsize, sizeof(snd_bufsize)) != 0) {
         close(fd_socket);
         return -1;
     }
-    if (setsockopt(fd_socket, SOL_SOCKET, SO_RCVBUF, 
+    if (rcv_bufsize && setsockopt(fd_socket, SOL_SOCKET, SO_RCVBUF, 
                                     (char *)&rcv_bufsize, sizeof(rcv_bufsize)) != 0) {
         close(fd_socket);
         return -1;
@@ -137,9 +137,10 @@ int udp_read(int fd, void *buf, size_t len, int flags, struct sockaddr_in *src_a
  */
 int udp_write(int fd, const void *buf, size_t len, int flags, const struct sockaddr_in *dst_addr)
 {
+    socklen_t addrlen = sizeof(struct sockaddr_in);
     struct pollfd fds[1];
     int nfds = 1;
-    int timeout = 3*1000;   //3s
+    int timeout = 100;          // 100ms
     memset(fds, 0, sizeof(fds));
     fds[0].fd = fd;
     fds[0].events = POLLOUT;
@@ -151,7 +152,6 @@ int udp_write(int fd, const void *buf, size_t len, int flags, const struct socka
         } else if (rc == 0) {   // timeout
             continue;
         } else {                // fd is ready for writting
-            socklen_t addrlen = sizeof(struct sockaddr_in);
             return sendto(fd, buf, len, flags, (const struct sockaddr *)dst_addr, addrlen);
         }
     }
