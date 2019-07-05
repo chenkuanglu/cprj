@@ -1,9 +1,7 @@
 # cprj
 linux c template project
 
-# build
-mkdir build
-
+# compile
 cd build
 
 cmake -DCMAKE_BUILD_TYPE=Debug ..

@@ -47,7 +47,7 @@ int common_init(void)
 }
 
 /**
- * @brief   进程退出处理，与匹配common_init使用
+ * @brief   进程退出处理，匹配common_init使用
  * @param   argc    命令行参数个数
  * @param   argv    命令行参数
  *
