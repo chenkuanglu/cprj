@@ -169,6 +169,8 @@ int argparser_add(argparser_t *parser, const char* opt_name, long opt_id, int pa
  * @param   parser      参数解析器
  * @param   parse_proc  解析器每发现一个选项，将回调处理函数parse_proc
  * @return  成功返回0，失败返回-1并设置errno
+ *
+ * @note    选项的实际的输入参数个数可以比预设的多，回调时也会传回实际个数，但是不能少，否则报错
  */
 int argparser_parse(argparser_t *parser, parse_callback_t parse_proc)
 {
