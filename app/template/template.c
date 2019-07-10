@@ -6,6 +6,7 @@
  
 #include "../../common/common.h"
 #include "template.h"
+#include <sys/sysinfo.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,6 +27,16 @@ Options:\n\
 ";
 
 static int cmdline_proc(long id, char **param, int num);
+
+void print_sysinfo(void)
+{
+    struct sysinfo sysi;
+    sysinfo(&sysi);
+    logn("system uptime: %02ld:%02ld:%02lds\n", 
+            sysi.uptime/3600, (sysi.uptime%3600)/60, (sysi.uptime%3600)%60);
+    logn("system free memory: " CCL_GREEN "%.3fMiB" CCL_WHITE_HL " / %.3fMiB\n" CCL_END, 
+            (double)sysi.freeram/1024/1024, (double)sysi.totalram/1024/1024);
+}
 
 // app example : print 'hello world'
 void event_print(void *arg)
@@ -62,6 +73,9 @@ void* thread_init(void *arg)
     logn("%s version %d.%d.%d\n", program_name, 
                     VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
 
+    // printf system info
+    print_sysinfo();
+
     // app example : print 'hello world'
     TMR_ADD(100, TMR_EVENT_TYPE_PERIODIC, 1.0, event_print, NULL);    
     for (;;) {
@@ -76,6 +90,11 @@ void* thread_init(void *arg)
 // 退出回调函数，不要直接调用 
 void app_proper_exit(int ec)
 {
+    long app_uptime = (long)(monotime() - tm_startup);
+    logn("%s uptime: %02ld:%02ld:%02lds\n", 
+            program_name, app_uptime/3600, (app_uptime%3600)/60, (app_uptime%3600)%60);
+    print_sysinfo();
+
     // app example : remove timer event id=100
     TMR_REMOVE(100);
     

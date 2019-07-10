@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <errno.h>
+#include <sys/sysinfo.h>
 #include "timetick.h"
 
 #ifdef __cplusplus
@@ -38,6 +39,21 @@ int nsleep(double sec)
     return nanosleep(&tms, NULL);
 }
 
+/**
+ * @brief   获取系统运行时间（不受RTC时间修改的影响），相当于monotime()向上取整
+ * @return  成功返回单调时间（单位秒），失败返回-1并设置errno
+ */
+long sysuptime(void)
+{
+    double ret = -1;
+    struct sysinfo sinfo;
+    if (sysinfo(&sinfo) == 0) {
+        ret = sinfo.uptime;
+    }
+    return ret;
+}
+
 #ifdef __cplusplus
 }
 #endif
+

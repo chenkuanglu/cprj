@@ -25,6 +25,7 @@ extern "C" {
 
 extern double   monotime(void);
 extern int      nsleep(double tm);
+extern long     sysuptime(void);
 
 #ifdef __cplusplus
 }

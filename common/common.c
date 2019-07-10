@@ -130,7 +130,7 @@ static void* thread_sig(void *arg)
         if (rc == 0) {
             printf("\n");   // ^C
             sprintf(reason, "killed by signal '%s'", (sig == SIGTERM) ? "SIGTERM" : "SIGINT");
-            logn("exit, %s\n", reason);
+            logw("exit, %s\n", reason);
             common_exit(0);
         } else {
             loge("sigwait() fail\n");
