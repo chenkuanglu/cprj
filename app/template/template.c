@@ -76,6 +76,15 @@ void* thread_init(void *arg)
     // printf system info
     print_sysinfo();
 
+    // create template thread
+    void* thread_template(void *arg);
+    pthread_t tid;
+    pthread_create(&tid, 0, thread_template, 0);
+    COMMON_RETIRE();
+}
+
+void* thread_template(void *arg)
+{
     // app example : print 'hello world'
     TMR_ADD(100, TMR_EVENT_TYPE_PERIODIC, 1.0, event_print, NULL);    
     for (;;) {

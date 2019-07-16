@@ -5,6 +5,7 @@ aux_source_directory(lib DIR_MOD_SRCS)
 aux_source_directory(timer DIR_MOD_SRCS)
 aux_source_directory(common DIR_MOD_SRCS)
 aux_source_directory(argparser DIR_MOD_SRCS)
+aux_source_directory(tty DIR_MOD_SRCS)
 
 link_libraries(pthread)
 link_libraries(curl)
@@ -22,4 +23,5 @@ add_library(clib ${DIR_MOD_SRCS})
 add_subdirectory(app/template)
 add_subdirectory(app/udp_server)
 add_subdirectory(app/udp_client)
+add_subdirectory(app/serial)
 
