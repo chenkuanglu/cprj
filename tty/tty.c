@@ -73,6 +73,23 @@ static int set_speed(int fd, int speed)
 // c_oflag： OPOST 输出后处理，如果不设置表示原始数据（本文使用原始数据）
 // c_cc[VMIN]： 最少可读数据
 // c_cc[VTIME]： 等待数据时间(10秒的倍数)
+//
+// VMIN VTIME:
+// 有效条件：阻塞 + read
+//
+// VMIN != 0,VTIME = 0时，read一直阻塞直到满足VMIN个
+// VMIN = 0,VTIME != 0时，read每隔vtime都会返回
+// VMIN = 0,VTIME = 0时，read总是返回!!!
+//
+// VMIN != 0,VTIME != 0时:
+// VMIN = 系统缓存的数据满足VMIN个read会返回，不足VMIN个时由VTIME决定read是否返回
+// VTIME = 从read调用开始，系统缓存的数据不满足VMIN个 且持续VTIME*100MS, 则read自动返回
+//
+// 一般串口的两种设置：
+// 1 按个读取：vmin = 1, vtime = 0：每个字节read都会返回，读取不到任何字节则一直阻塞
+// 2 按块读取：vmin != 0, vtime != 0：每个块只返回一次（效率高），但是当块丢失字节时，需要超时返回来告诉app块个数不足且已经超时丢失
+//                      这要求app协议要么是时间敏感的，要么是同步读取协议的（即硬件应答的帧与帧间隔由app控制）
+//
 static int set_parity(int fd, int databits, int stopbits, int parity)
 {
     struct termios options;
