@@ -45,7 +45,7 @@ void print_sysinfo(void)
 // app example : print 'hello world'
 void event_write(void *arg)
 {
-    char buf[4] = {0x00, 0x00, 0x2a, 0x24};
+    char buf[4] = {0x00, 0x01, 0x2a, 0x24};
     tty_write(fd, buf, sizeof(buf));
 }
 
@@ -99,11 +99,17 @@ void* thread_template(void *arg)
     }
 
     TMR_ADD(100, TMR_EVENT_TYPE_PERIODIC, 3.0, event_write, NULL);    
+    char sbuf[6];
+    int num = 0;
     for (;;) {
-        nsleep(0.2);
-        if (monotime() - tm_startup >= 6) {
-            logw("Time to exit.\n");
-            common_exit(EXIT_SUCCESS);
+        int rc = tty_read(fd, sbuf+num, 6);
+        if (rc > 0) {
+            logw("tty read: %d\n", rc);
+            num += rc;
+        } else if (rc == 0) {
+            logi("tty read: %d\n", rc);
+        } else {
+            loge("tty read error\n");
         }
     }
 }
