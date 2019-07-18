@@ -8,41 +8,38 @@
 // tty_write = have buffer ?
 
 #include "tty.h"
+#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int speed_arr[] = { 
-    B1000000, B500000, B115200,B57600, B38400, B19200, B9600, B4800, B2400, B1200, B300,
-	B38400, B19200, B9600, B4800, B2400, B1200, B300, 
+static int speed_arr[] = { 
+    B1000000, B500000, B115200,B57600, B38400, B19200, B9600, B4800, B2400, B1200, B300
+};
+static int speed_name_arr[] = {
+    1000000, 500000, 115200, 57600, 38400,  19200,  9600,  4800,  2400,  1200,  300
 };
 
-int name_arr[] = {
-    1000000, 500000, 115200, 57600, 38400,  19200,  9600,  4800,  2400,  1200,  300,
-	38400,  19200,  9600, 4800, 2400, 1200,  300, 
-};
-
-static int set_speed(int fd, int speed)
+int tty_setspeed(int fd, int speed)
 {
     unsigned        i;
-    int             status;
     struct termios  opt;
     
     tcgetattr(fd, &opt);
-    for (i= 0;  i < (sizeof(speed_arr) / sizeof(int)); i++) {
-        if (speed == name_arr[i]) {
+    for (i= 0; i < (sizeof(speed_arr) / sizeof(int)); i++) {
+        if (speed == speed_name_arr[i]) {
             tcflush(fd, TCIOFLUSH);
             cfsetispeed(&opt, speed_arr[i]);
             cfsetospeed(&opt, speed_arr[i]);
-            status = tcsetattr(fd, TCSANOW, &opt);
-            if  (status != 0) {
+            if (tcsetattr(fd, TCSANOW, &opt) != 0) {
                 return -1;
             }
             return 0;
      	}
     }
 
+    errno = EINVAL;
     return -1;
 }
 
@@ -77,99 +74,82 @@ static int set_speed(int fd, int speed)
 // VMIN VTIME:
 // 有效条件：阻塞 + read
 //
-// VMIN != 0,VTIME = 0时，read一直阻塞直到满足VMIN个
-// VMIN = 0,VTIME != 0时，read每隔vtime都会返回
-// VMIN = 0,VTIME = 0时，read总是返回!!!
-//
-// VMIN != 0,VTIME != 0时:
-// VMIN = 系统缓存的数据满足VMIN个read会返回，不足VMIN个时由VTIME决定read是否返回
-// VTIME = 从read调用开始，系统缓存的数据不满足VMIN个 且持续VTIME*100MS, 则read自动返回
-//
-// 一般串口的两种设置：
-// 1 按个读取：vmin = 1, vtime = 0：每个字节read都会返回，读取不到任何字节则一直阻塞
-// 2 按块读取：vmin != 0, vtime != 0：每个块只返回一次（效率高），但是当块丢失字节时，需要超时返回来告诉app块个数不足且已经超时丢失
-//                      这要求app协议要么是时间敏感的，要么是同步读取协议的（即硬件应答的帧与帧间隔由app控制）
-//
-static int set_parity(int fd, int databits, int stopbits, int parity)
+static int tty_setattr(int fd, int databits, int parity, int stopbits, uint8_t vtime, uint8_t vmin)
 {
     struct termios options;
-    
     if (tcgetattr(fd,&options) !=  0) {
       	return -1;
     }
     
-	options.c_cflag |= CBAUDEX;
-  	options.c_cflag &= ~CSIZE;
-    options.c_cflag &= ~CSIZE; 
-    options.c_cflag |= (CLOCAL | CREAD); 
-    options.c_cflag &= ~CRTSCTS; 
+    options.c_cflag |= (CBAUDEX | CLOCAL | CREAD); 
+    options.c_cflag &= ~(ONLCR | OCRNL | CSIZE | CRTSCTS); 
+
     options.c_oflag &= ~OPOST; 
-    options.c_cflag &= ~(ONLCR|OCRNL); 
+    options.c_iflag &= ~(ICRNL | INLCR | IXON | IXOFF | IXANY); 
+
     options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); 
-    options.c_iflag &= ~(ICRNL | INLCR); 
-    options.c_iflag &= ~(IXON | IXOFF | IXANY); 
 
     switch (databits) {
-  	case 7:
-  		options.c_cflag |= CS7;
-  		break;
-  	case 8:
-		options.c_cflag |= CS8;
-		break;
-	default:
-		return -1;
-	}
+        case 5:
+            options.c_cflag |= CS5;
+            break;
+        case 6:
+            options.c_cflag |= CS6;
+            break;
+        case 7:
+            options.c_cflag |= CS7;
+            break;
+        case 8:
+            options.c_cflag |= CS8;
+            break;
+        default:
+            return -1;
+    }
+	
+    switch (stopbits)
+    {
+        case 1:
+            options.c_cflag &= ~CSTOPB;
+            break;
+        case 2:
+            options.c_cflag |= CSTOPB;
+            break;
+        default:
+            return -1;
+    }
 	
     switch (parity) {
-  	case 'n':
-	case 'N':
-		options.c_cflag &= ~PARENB;     /* Clear parity enable */
-		options.c_iflag &= ~INPCK;      /* Enable parity checking */
-		break;
-	case 'o':
-	case 'O':
-		options.c_cflag |= PARENB;      /* Enable parity */
-		options.c_cflag |= PARODD;      /* odd */ 
-		options.c_iflag |= INPCK | ISTRIP;       /* Enable parity checking on input */
-		break;
-	case 'e':
-	case 'E':
-		options.c_cflag |= PARENB;      /* Enable parity */
-		options.c_cflag &= ~PARODD;     /* even */ 
-		options.c_iflag |= INPCK | ISTRIP;       /* Enable parity checking on input */
-		break;
-	case 'S':
-	case 's':                           /* as no parity*/
-		options.c_cflag &= ~PARENB;
-		options.c_cflag &= ~CSTOPB;
-		break;
-	default:
-		return -1;
-	}
+        case 's':
+        case 'S':
+            options.c_cflag &= ~CSTOPB;
+            //break;
+        case 'n':
+        case 'N':
+            options.c_cflag &= ~PARENB;         /* Clear parity enable */
+            options.c_iflag &= ~INPCK;          /* Disable parity checking */
+            break;
+        case 'o':
+        case 'O':
+            options.c_cflag |= PARENB;          /* Enable parity */
+            options.c_cflag |= PARODD;          /* odd */ 
+            options.c_iflag |= INPCK | ISTRIP;  /* Enable parity checking on input */
+            break;
+        case 'e':
+        case 'E':
+            options.c_cflag |= PARENB;          /* Enable parity */
+            options.c_cflag &= ~PARODD;         /* even */ 
+            options.c_iflag |= INPCK | ISTRIP;  /* Enable parity checking on input */
+            break;
+        default:
+            return -1;
+    }
  
-    switch (stopbits)
-  	{
-  	case 1:
-  		options.c_cflag &= ~CSTOPB;
-		break;
-	case 2:
-		options.c_cflag |= CSTOPB;
-		break;
-	default:
-		return -1;
-	}
-	
-    /* Set input parity option */
-    if (parity != 'n') {
-  		options.c_iflag |= INPCK;
-  	}
-    options.c_cc[VTIME] = 5;
-    options.c_cc[VMIN] = 0;
+    options.c_cc[VTIME] = vtime;
+    options.c_cc[VMIN] = vmin;
 
-    tcflush(fd,TCIFLUSH);           /* Update the options and do it NOW */
-    if (tcsetattr(fd,TCSANOW,&options) != 0)
-  	{
-		return (-1);
+    tcflush(fd, TCIFLUSH);
+    if (tcsetattr(fd, TCSANOW, &options) != 0) {
+		return -1;
 	}
 	
     return 0;
@@ -183,19 +163,31 @@ static int set_parity(int fd, int databits, int stopbits, int parity)
 // 因此，O_NONBLOCK就产生出来，它在读取不到数据时会回传-1，并且设置errno为EAGAIN
 //
 //int fd = open(pathname, O_RDWR | O_NOCTTY);
-int tty_open(const char *pathname, int flags, int baud)
+//
+//
+//////////////////////////////////////////////////////////
+// int fd = tty_open(pathname, O_RDWR | O_NDELAY, 115200, 0, 1);
+// 1 vtime vmin 同时为0时，read函数为非阻塞
+// 2 vtime vmin 不同时为0时，vtime=0 则read函数只有满足个数时才返回，
+// 3 vtime vmin 不同时为0时，vtime>0 则read函数不仅在满足个数时才返回，也会在vmin<read_count且持续vtime时返回（实际个数)
+//
+// 由此可以推断：vtime>0, vmin=0时，只要串口空闲（无数据）vtime，read便会超时返回
+//
+int tty_open(const char *pathname, int flags, long baud, uint8_t vtime, uint8_t vmin)
 {
-	int fd = open(pathname, flags);
-	if (fd > 0) {
-    	if (set_parity(fd, 8, 1, 'N') < 0) {
-            return -1;
-    	}
-	    set_speed(fd, baud);
-	} else {
-		return -1;
-	}
-
-	return fd;
+    int fd;
+    if ((fd = open(pathname, flags)) == -1) {
+    	return -1;
+    }
+    if (tty_setattr(fd, 8, 'N', 1, vtime, vmin) != 0) {
+        tty_close(fd);
+        return -1;
+    }
+    if (tty_setspeed(fd, baud) != 0) {
+        tty_close(fd);
+        return -1;
+    }
+    return fd;
 }
 
 ssize_t tty_read(int fd, void *buf, size_t count)

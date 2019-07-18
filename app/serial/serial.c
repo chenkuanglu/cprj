@@ -91,7 +91,7 @@ void* thread_init(void *arg)
 void* thread_template(void *arg)
 {
     const char *dev = "/dev/ttyS1";
-    fd = tty_open(dev, O_RDWR | O_NOCTTY, 115200);
+    fd = tty_open(dev, O_RDWR | O_NOCTTY, 115200, 0, 1);
 
     if (fd == -1) {
         loge("fail to open '%s'\n", dev);
@@ -101,11 +101,13 @@ void* thread_template(void *arg)
     TMR_ADD(100, TMR_EVENT_TYPE_PERIODIC, 3.0, event_write, NULL);    
     char sbuf[6];
     int num = 0;
+
+    event_write(NULL);
     for (;;) {
-        int rc = tty_read(fd, sbuf+num, 6);
+        int rc = tty_read(fd, sbuf+num, 6-num);
         if (rc > 0) {
-            logw("tty read: %d\n", rc);
-            num += rc;
+            logw("tty read %d: 0x%02x\n", rc, sbuf[num]);
+            num = (num + rc) % 6;
         } else if (rc == 0) {
             logi("tty read: %d\n", rc);
         } else {
