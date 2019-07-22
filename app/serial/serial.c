@@ -108,8 +108,10 @@ void* thread_template(void *arg)
         if (rc > 0) {
             logw("tty read %d char\n", rc);
             num += rc;
-            if (num >= 6)
-                logw("tty read %02x %02x %02x %02x %02x %02x\n", sbuf[0], sbuf[1], sbuf[2], sbuf[3], sbuf[4], sbuf[5]);
+            if (num == 6) {
+                logi("tty read data: %02x %02x %02x %02x %02x %02x\n", sbuf[0], sbuf[1], sbuf[2], sbuf[3], sbuf[4], sbuf[5]);
+                num = 0;
+            }
         } else if (rc == 0) {
             logi("tty read: %d\n", rc);
         } else {
