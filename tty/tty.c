@@ -165,16 +165,26 @@ static int tty_setattr(int fd, int databits, int parity, int stopbits, uint8_t v
 //int fd = open(pathname, O_RDWR | O_NOCTTY);
 //
 ///////////////////////////////////
-// 假设：read函数读取个数为count, VMIN=vmin, 串口缓存某时刻为sbuf_count个bytes
-// 那么, read函数返回机制遵循以下规则：
-// 1 vtime vmin 同时为0时，read函数为非阻塞
-// 2 vtime=0 时read函数不会因为超时而返回，vtime!=0时read函数可以由超时而返回
-// 3 vmin 只有在vtime!=0 时才有效
-// 4 vtime vmin 不同时为0时, 只要read函数返回，则其返回个数都不会大于count
+// 假设：
+// 1 read函数读取个数为size
+// 2 VMIN参数值配置为vmin 
+// 3 串口缓存t时刻个数为count
+// 4 read函数返回值为ret
 //
-// 由此可以推断以下现象：
-// vtime=0 时，只有串口缓存个数不小于count，read才会返回，返回值为min(sbuf_count,count)
-// vtime!=0, 串口缓存个数持续小于vmin且超时 或则 串口缓存个数满足count, read会返回，返回值为min(sbuf_count,count)
+// 则有：
+// 1 read函数在阻塞模式下变成非阻塞：vmin=0 && vtime=0
+// 2 read函数只有满足条件返回，但没有超时返回：vtime=0 && vmin!=0
+// 3 read函数既有满足条件返回，也有超时返回：vtime!=0 (vmin是否为0都可以超时返回)
+// 4 read函数满足条件返回：vmin!=0 && count >= min(size,vmin) && ret = min(size,count)
+// 5 read函数超时返回：( count<min(size,vmin) && (count>0 || count>=vmin) ) && ret = min(max(0,vmin), count)
+//      a 如果vmin=0, 则read在超时后会返回0, 例如串口空闲时read将周期性返回
+//      b 如果vmin!=0, 则read只能在count>0时超时返回
+//
+// 总结串口的阻塞功能：
+// 1 满足指定的某个字节数vmin 或者 满足read期望值时read返回, 无超时返回
+// 2 不满足指定的某个最小字节数vmin 并且 也不满足read期望值时 read超时返回系统缓存的剩余字节数，如果无剩余则不返回
+// 3 不满足read期望值时 read总是超时返回，无论系统缓存有没有剩余数据
+//
 int tty_open(const char *pathname, int flags, long baud, uint8_t vtime, uint8_t vmin)
 {
     int fd;
