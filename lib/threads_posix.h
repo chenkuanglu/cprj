@@ -27,9 +27,6 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <stdlib.h>
-#ifndef assert
-#include <assert.h>
-#endif
 #include <limits.h>
 #include <errno.h>
 #include <unistd.h>
@@ -191,23 +188,27 @@ __attribute__((weak))
 int pthread_mutexattr_destroy(pthread_mutexattr_t *attr);
 #endif
 
-// 7.25.4.2
-static inline int
-mtx_init(mtx_t *mtx, int type)
+/* mutex lock */
+
+static inline int mtx_init(mtx_t *mtx, int type)
 {
-    pthread_mutexattr_t attr;
-    assert(mtx != NULL);
-    if (type != mtx_plain && type != mtx_timed && type != mtx_try
-      && type != (mtx_plain|mtx_recursive)
-      && type != (mtx_timed|mtx_recursive)
-      && type != (mtx_try|mtx_recursive))
+    if (mtx == NULL) {
+        errno = EINVAL;
         return thrd_error;
+    }
+    if (type != mtx_plain && type != mtx_timed && type != mtx_try
+                            && type != (mtx_plain|mtx_recursive)
+                            && type != (mtx_timed|mtx_recursive)
+                            && type != (mtx_try|mtx_recursive)) {
+        return thrd_error;
+    }
 
     if ((type & mtx_recursive) == 0) {
         pthread_mutex_init(mtx, NULL);
         return thrd_success;
     }
 
+    pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(mtx, &attr);
@@ -215,41 +216,37 @@ mtx_init(mtx_t *mtx, int type)
     return thrd_success;
 }
 
-// 7.25.4.3
-static inline int
-mtx_lock(mtx_t *mtx)
+static inline int mtx_lock(mtx_t *mtx)
 {
-    assert(mtx != NULL);
     return (pthread_mutex_lock(mtx) == 0) ? thrd_success : thrd_error;
 }
 
-static inline int
-mtx_trylock(mtx_t *mtx);
+static inline int mtx_trylock(mtx_t *mtx);
+static inline void thrd_yield(void);
 
-static inline void
-thrd_yield(void);
-
-// 7.25.4.4
-static inline int
-mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
+static inline int mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
 {
-    assert(mtx != NULL);
-    assert(ts != NULL);
+    if (mtx == NULL || ts == NULL) {
+        errno = EINVAL;
+        return thrd_error;
+    }
 
     {
 #ifdef EMULATED_THREADS_USE_NATIVE_TIMEDLOCK
     int rt;
     rt = pthread_mutex_timedlock(mtx, ts);
-    if (rt == 0)
+    if (rt == 0) {
         return thrd_success;
+    }
     return (rt == ETIMEDOUT) ? thrd_busy : thrd_error;
 #else
     time_t expire = time(NULL);
     expire += ts->tv_sec;
     while (mtx_trylock(mtx) != thrd_success) {
         time_t now = time(NULL);
-        if (expire < now)
+        if (expire < now) {
             return thrd_busy;
+        }
         // busy loop!
         thrd_yield();
     }
@@ -258,19 +255,13 @@ mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
     }
 }
 
-// 7.25.4.5
-static inline int
-mtx_trylock(mtx_t *mtx)
+static inline int mtx_trylock(mtx_t *mtx)
 {
-    assert(mtx != NULL);
     return (pthread_mutex_trylock(mtx) == 0) ? thrd_success : thrd_busy;
 }
 
-// 7.25.4.6
-static inline int
-mtx_unlock(mtx_t *mtx)
+static inline int mtx_unlock(mtx_t *mtx)
 {
-    assert(mtx != NULL);
     return (pthread_mutex_unlock(mtx) == 0) ? thrd_success : thrd_error;
 }
 

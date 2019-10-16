@@ -1,22 +1,11 @@
 /**
  * @file    threads.h
  * @author  ln
- * @brief   c11 threads
+ * @brief   C11 <threads.h> emulation library
  */
 
 #ifndef __THREADS_H__
 #define __THREADS_H__
-
-#if defined(_WIN32)
-#include <process.h>    // MSVCRT
-#include <windows.h>
-#else
-#include <pthread.h>
-#endif
-
-#include <limits.h>
-#include <errno.h>
-#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,24 +26,18 @@ enum {
     thrd_nomem          // out of memory
 };
 
-typedef pthread_t thrd_t;
-typedef pthread_key_t tss_t;
-
 typedef int (*thrd_start_t)(void*);
 typedef void (*tss_dtor_t)(void*);
 
-extern int thrd_create(thrd_t *, thrd_start_t, void *);
-
-extern int      mux_init(mux_t *mux);
-extern mux_t*   mux_new(mux_t **mux);
-extern void     mux_destroy(mux_t *mux);
-
-extern int      mux_lock(mux_t *mux);
-extern int      mux_trylock(mux_t *mux);
-extern int      mux_unlock(mux_t *mux);
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#include "threads_win32.h"
+#else
+#include "threads_posix.h"
+#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // __THR_MUX__
+#endif // __THREADS_H__
+
