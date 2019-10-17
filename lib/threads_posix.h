@@ -93,6 +93,68 @@ call_once(once_flag *flag, void (*func)(void))
     pthread_once(flag, func);
 }
 
+/* thread */
+
+static inline int thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
+{
+    if (thr == NULL) {
+        errno = EINVAL;
+        return thrd_error;
+    }
+    struct impl_thrd_param *pack;
+    pack = (struct impl_thrd_param *)malloc(sizeof(struct impl_thrd_param));
+    if (!pack) return thrd_nomem;
+    pack->func = func;
+    pack->arg = arg;
+    if (pthread_create(thr, NULL, impl_thrd_routine, pack) != 0) {
+        free(pack);
+        return thrd_error;
+    }
+    return thrd_success;
+}
+
+static inline void thrd_exit(int res)
+{
+    pthread_exit((void*)(intptr_t)res);
+}
+
+static inline int thrd_join(thrd_t thr, int *res)
+{
+    void *code;
+    if (pthread_join(thr, &code) != 0)
+        return thrd_error;
+    if (res)
+        *res = (int)(intptr_t)code;
+    return thrd_success;
+}
+
+static inline thrd_t thrd_current(void)
+{
+    return pthread_self();
+}
+
+static inline int thrd_detach(thrd_t thr)
+{
+    return (pthread_detach(thr) == 0) ? thrd_success : thrd_error;
+}
+
+static inline int thrd_equal(thrd_t thr0, thrd_t thr1)
+{
+    return pthread_equal(thr0, thr1);
+}
+
+static inline void thrd_sleep(const struct timespec *time_point, struct timespec *remaining)
+{
+    if (time_point != NULL)
+        nanosleep(time_point, remaining);
+}
+
+static inline void thrd_yield(void)
+{
+    sched_yield();
+}
+
+
 
 /*------------- 7.25.3 Condition variable functions -------------*/
 // 7.25.3.1
@@ -153,41 +215,6 @@ cnd_wait(cnd_t *cond, mtx_t *mtx)
 }
 
 
-/*-------------------- 7.25.4 Mutex functions --------------------*/
-// 7.25.4.1
-static inline void
-mtx_destroy(mtx_t *mtx)
-{
-    assert(mtx != NULL);
-    pthread_mutex_destroy(mtx);
-}
-
-/*
- * XXX: Workaround when building with -O0 and without pthreads link.
- *
- * In such cases constant folding and dead code elimination won't be
- * available, thus the compiler will always add the pthread_mutexattr*
- * functions into the binary. As we try to link, we'll fail as the
- * symbols are unresolved.
- *
- * Ideally we'll enable the optimisations locally, yet that does not
- * seem to work.
- *
- * So the alternative workaround is to annotate the symbols as weak.
- * Thus the linker will be happy and things don't clash when building
- * with -O1 or greater.
- */
-#if defined(HAVE_FUNC_ATTRIBUTE_WEAK) && !defined(__CYGWIN__)
-__attribute__((weak))
-int pthread_mutexattr_init(pthread_mutexattr_t *attr);
-
-__attribute__((weak))
-int pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type);
-
-__attribute__((weak))
-int pthread_mutexattr_destroy(pthread_mutexattr_t *attr);
-#endif
-
 /* mutex lock */
 
 static inline int mtx_init(mtx_t *mtx, int type)
@@ -216,13 +243,20 @@ static inline int mtx_init(mtx_t *mtx, int type)
     return thrd_success;
 }
 
+static inline void mtx_destroy(mtx_t *mtx)
+{
+    pthread_mutex_destroy(mtx);
+}
+
 static inline int mtx_lock(mtx_t *mtx)
 {
     return (pthread_mutex_lock(mtx) == 0) ? thrd_success : thrd_error;
 }
 
-static inline int mtx_trylock(mtx_t *mtx);
-static inline void thrd_yield(void);
+static inline int mtx_trylock(mtx_t *mtx)
+{
+    return (pthread_mutex_trylock(mtx) == 0) ? thrd_success : thrd_busy;
+}
 
 static inline int mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
 {
@@ -255,11 +289,6 @@ static inline int mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
     }
 }
 
-static inline int mtx_trylock(mtx_t *mtx)
-{
-    return (pthread_mutex_trylock(mtx) == 0) ? thrd_success : thrd_busy;
-}
-
 static inline int mtx_unlock(mtx_t *mtx)
 {
     return (pthread_mutex_unlock(mtx) == 0) ? thrd_success : thrd_error;
@@ -268,77 +297,13 @@ static inline int mtx_unlock(mtx_t *mtx)
 
 /*------------------- 7.25.5 Thread functions -------------------*/
 // 7.25.5.1
-static inline int
-thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
-{
-    struct impl_thrd_param *pack;
-    assert(thr != NULL);
-    pack = (struct impl_thrd_param *)malloc(sizeof(struct impl_thrd_param));
-    if (!pack) return thrd_nomem;
-    pack->func = func;
-    pack->arg = arg;
-    if (pthread_create(thr, NULL, impl_thrd_routine, pack) != 0) {
-        free(pack);
-        return thrd_error;
-    }
-    return thrd_success;
-}
-
 // 7.25.5.2
-static inline thrd_t
-thrd_current(void)
-{
-    return pthread_self();
-}
-
 // 7.25.5.3
-static inline int
-thrd_detach(thrd_t thr)
-{
-    return (pthread_detach(thr) == 0) ? thrd_success : thrd_error;
-}
-
 // 7.25.5.4
-static inline int
-thrd_equal(thrd_t thr0, thrd_t thr1)
-{
-    return pthread_equal(thr0, thr1);
-}
-
 // 7.25.5.5
-static inline void
-thrd_exit(int res)
-{
-    pthread_exit((void*)(intptr_t)res);
-}
-
 // 7.25.5.6
-static inline int
-thrd_join(thrd_t thr, int *res)
-{
-    void *code;
-    if (pthread_join(thr, &code) != 0)
-        return thrd_error;
-    if (res)
-        *res = (int)(intptr_t)code;
-    return thrd_success;
-}
-
 // 7.25.5.7
-static inline void
-thrd_sleep(const struct timespec *time_point, struct timespec *remaining)
-{
-    assert(time_point != NULL);
-    nanosleep(time_point, remaining);
-}
-
 // 7.25.5.8
-static inline void
-thrd_yield(void)
-{
-    sched_yield();
-}
-
 
 /*----------- 7.25.6 Thread-specific storage functions -----------*/
 // 7.25.6.1
