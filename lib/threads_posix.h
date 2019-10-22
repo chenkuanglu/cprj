@@ -253,7 +253,6 @@ static inline int tss_set(tss_t key, void *val)
 
 /* time */
 
-#ifndef HAVE_TIMESPEC_GET
 static inline int timespec_get(struct timespec *ts, int base)
 {
     if (!ts) return 0;
@@ -263,5 +262,4 @@ static inline int timespec_get(struct timespec *ts, int base)
     }
     return 0;
 }
-#endif
 
