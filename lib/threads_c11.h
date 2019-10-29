@@ -1,8 +1,30 @@
 /**
- * @file    threads_posix.h
+ * @file    threads_c11.h
  * @author  ln
- * @brief   C11 <threads.h> emulation library
+ * @brief   C11 <threads.h> emulation library for Linux & Visual Studio
  */
+
+#ifndef __THREADS_C11_H__
+#define __THREADS_C11_H__
+
+#define mtx_mono    0x200
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
+
+#include "thr/threads.h"
+#define TIME_MONO TIME_UTC
+#undef  cnd_timedwait
+
+#define cnd_init_r(cnd, base)           cnd_init(cnd)
+#define cnd_timedwait(cnd, mtx, tm)     _Cnd_timedwait((*cnd), (*mtx), (xtime *)tm)
+#define timespec_get(tm, base)          xtime_get((xtime *)(tm), base)
+#define timespec_get_r(tm, base)        xtime_get((xtime *)(tm), base)
+
+#else
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdlib.h>
 #include <limits.h>
@@ -43,7 +65,13 @@ typedef void (*tss_dtor_t)(void*);
 #define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
 #define TSS_DTOR_ITERATIONS PTHREAD_DESTRUCTOR_ITERATIONS
 
-typedef pthread_cond_t  cnd_t;
+#define TIME_MONO 15
+
+typedef struct {
+    pthread_cond_t      cnd;
+    pthread_condattr_t  cnd_attr;
+} cnd_t;
+
 typedef pthread_t       thrd_t;
 typedef pthread_key_t   tss_t;
 typedef pthread_mutex_t mtx_t;
@@ -131,27 +159,52 @@ static inline void thrd_yield(void)
 
 static inline int cnd_broadcast(cnd_t *cond)
 {
-    return (pthread_cond_broadcast(cond) == 0) ? thrd_success : thrd_error;
+    return (pthread_cond_broadcast(&cond->cnd) == 0) ? thrd_success : thrd_error;
 }
 
 static inline void cnd_destroy(cnd_t *cond)
 {
-    pthread_cond_destroy(cond);
+    pthread_cond_destroy(&cond->cnd);
+    pthread_condattr_destroy(&cond->cnd_attr);
 }
 
 static inline int cnd_init(cnd_t *cond)
 {
-    return (pthread_cond_init(cond, NULL) == 0) ? thrd_success : thrd_error;
+    if (cond == NULL) {
+        errno = EINVAL;
+        return thrd_error;
+    }
+    pthread_condattr_init(&cond->cnd_attr);
+    return (pthread_cond_init(&cond->cnd, NULL) == 0) ? thrd_success : thrd_error;
+}
+
+static inline int cnd_init_r(cnd_t *cond, int base)
+{
+    if (cond == NULL) {
+        errno = EINVAL;
+        return thrd_error;
+    }
+    if (base == TIME_UTC) {
+        pthread_condattr_init(&cond->cnd_attr);
+        return (pthread_cond_init(&cond->cnd, NULL) == 0) ? thrd_success : thrd_error;
+    } else if (base == TIME_MONO) {
+        pthread_condattr_init(&cond->cnd_attr);
+        if ((errno=pthread_condattr_setclock(&cond->cnd_attr, CLOCK_MONOTONIC)) != 0)
+            return thrd_error;
+        return (pthread_cond_init(&cond->cnd, &cond->cnd_attr) == 0) ? thrd_success : thrd_error;
+    } else {
+        return thrd_error;
+    }
 }
 
 static inline int cnd_signal(cnd_t *cond)
 {
-    return (pthread_cond_signal(cond) == 0) ? thrd_success : thrd_error;
+    return (pthread_cond_signal(&cond->cnd) == 0) ? thrd_success : thrd_error;
 }
 
 static inline int cnd_timedwait(cnd_t *cond, mtx_t *mtx, const struct timespec *abs_time)
 {
-    int rt = pthread_cond_timedwait(cond, mtx, abs_time);
+    int rt = pthread_cond_timedwait(&cond->cnd, mtx, abs_time);
     if (rt == ETIMEDOUT)
         return thrd_busy;
     return (rt == 0) ? thrd_success : thrd_error;
@@ -159,7 +212,7 @@ static inline int cnd_timedwait(cnd_t *cond, mtx_t *mtx, const struct timespec *
 
 static inline int cnd_wait(cnd_t *cond, mtx_t *mtx)
 {
-    return (pthread_cond_wait(cond, mtx) == 0) ? thrd_success : thrd_error;
+    return (pthread_cond_wait(&cond->cnd, mtx) == 0) ? thrd_success : thrd_error;
 }
 
 
@@ -172,9 +225,9 @@ static inline int mtx_init(mtx_t *mtx, int type)
         return thrd_error;
     }
     if (type != mtx_plain && type != mtx_timed && type != mtx_try
-                            && type != (mtx_plain|mtx_recursive)
-                            && type != (mtx_timed|mtx_recursive)
-                            && type != (mtx_try|mtx_recursive)) {
+                                && type != (mtx_plain|mtx_recursive)
+                                && type != (mtx_timed|mtx_recursive)
+                                && type != (mtx_try|mtx_recursive)) {
         return thrd_error;
     }
 
@@ -270,7 +323,7 @@ static inline int tss_set(tss_t key, void *val)
 
 /* time */
 
-static inline int timespec_get(struct timespec *ts, int base)
+int timespec_get_r(struct timespec *ts, int base)
 {
     if (!ts) 
         return 0;
@@ -283,4 +336,12 @@ static inline int timespec_get(struct timespec *ts, int base)
     }
     return 0;
 }
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // defined(_WIN32) && !defined(__CYGWIN__)
+
+#endif  // __THREADS_C11_H__
 
