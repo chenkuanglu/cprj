@@ -9,10 +9,10 @@ int main()
     struct timespec tm;
 
     mtx_init(&mtx, mtx_plain);
-    //cnd_init_r(&cond, TIME_MONO);
-    //timespec_get_r(&tm, TIME_MONO);
-    cnd_init_r(&cond, TIME_UTC);
-    timespec_get_r(&tm, TIME_UTC);
+    cnd_init_r(&cond, TIME_MONO);
+    timespec_get_r(&tm, TIME_MONO);
+    //cnd_init_r(&cond, TIME_UTC);
+    //timespec_get_r(&tm, TIME_UTC);
 
     tm.tv_sec += 2;
     printf("timespec_get_r() sec=%ld\n", tm.tv_sec);

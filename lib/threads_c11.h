@@ -7,8 +7,6 @@
 #ifndef __THREADS_C11_H__
 #define __THREADS_C11_H__
 
-#define mtx_mono    0x200
-
 #if defined(_WIN32) && !defined(__CYGWIN__)
 
 #include "thr/threads.h"
@@ -98,7 +96,7 @@ static inline void call_once(once_flag *flag, void (*func)(void))
 
 static inline int thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
 {
-    if (thr == NULL) {
+    if (thr == NULL || func == NULL) {
         errno = EINVAL;
         return thrd_error;
     }
