@@ -25,10 +25,17 @@ extern "C" {
 
 extern double   monotime(void);
 extern int      nsleep(double tm);
-extern long     sysuptime(void);
+
+extern int      time2gmt(struct tm *result, const time_t *timep);
+extern int      time2local(struct tm *result, const time_t *timep);
+extern int      time2str(char *str, const struct tm *tm, int size);
+
+extern int      str2local(struct tm *result, const char *str);
+extern int      local2time(time_t *timep, const struct tm *tm);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
+
