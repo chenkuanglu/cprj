@@ -7,8 +7,9 @@
 #ifndef __TIMETICK_H__
 #define __TIMETICK_H__
 
-#include <unistd.h>
-#include <time.h>
+#include "threads_c11.h"
+#include <string.h>
+#include <ctype.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,12 +27,11 @@ extern "C" {
 extern double   monotime(void);
 extern int      nsleep(double tm);
 
-extern int      time2gmt(struct tm *result, const time_t *timep);
-extern int      time2local(struct tm *result, const time_t *timep);
-extern int      time2str(char *str, const struct tm *tm, int size);
+extern struct tm*   time2gmt(struct tm *result, const time_t *timep);
+extern struct tm*   time2local(struct tm *result, const time_t *timep);
+extern char*        time2str(char *str, const struct tm *tm, int size);
 
-extern int      str2local(struct tm *result, const char *str);
-extern int      local2time(time_t *timep, const struct tm *tm);
+extern struct tm*   str2local(struct tm *result, const char *str);
 
 #ifdef __cplusplus
 }

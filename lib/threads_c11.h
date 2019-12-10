@@ -17,16 +17,23 @@
 #undef  cnd_timedwait
 #define cnd_timedwait(cnd, mtx, tm)     _Cnd_timedwait((*cnd), (*mtx), (xtime *)tm)
 
+struct timespec {
+    time_t  tv_sec;
+    long    tv_nsec;
+};
+
 #else   // linux
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <errno.h>
 #include <unistd.h>
+#include <time.h>
 #include <sched.h>
 #include <stdint.h>     /* for intptr_t */
 
@@ -68,7 +75,7 @@ typedef pthread_key_t   tss_t;
 typedef pthread_mutex_t mtx_t;
 typedef pthread_once_t  once_flag;
 
-extern void call_once(once_flag *flag, void (*func)(void));
+extern void     call_once(once_flag *flag, void (*func)(void));
 
 /* thread */
 extern int      thrd_create(thrd_t *thr, thrd_start_t func, void *arg);

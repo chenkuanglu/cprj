@@ -29,6 +29,14 @@ int main()
     nsleep(1.5);
     printf("end sleep ...       [time=%f]\n", monotime());
 
+    struct tm tt;
+    time_t key = time(NULL);
+    char buf[100];
+    time2local(&tt, &key);
+    time2str(buf, &tt, 100-1);
+    str2local(&tt, buf);
+    printf("org time=%ld, time2str=%s, str2local=%ld\n", key, buf, mktime(&tt));
+
     getchar();
     return 0;
 }
