@@ -62,7 +62,7 @@ int mpool_init(mpool_t *mpool, size_t data_size, size_t n, void *ebuf)
         return -1;
     }
 
-    if (mux_init(&mpool->lock) != 0)
+    if (mtx_init(&mpool->lock, mtx_plain | mtx_recursive) == thrd_error)
         return -1;
     mpool->sbuf = NULL;
 
@@ -149,7 +149,7 @@ int mpool_destroy(mpool_t *mpool)
         errno = EINVAL;
         return -1;
     }
-    mux_lock(&mpool->lock);
+    mtx_lock(&mpool->lock);
     if (mpool->mode == MPOOL_MODE_DGROWN || mpool->mode == MPOOL_MODE_ISTATIC) {
         mpool_elm_t *p;
         TAILQ_FOREACH_REVERSE(p, &mpool->hdr_buf, __mpool_head, entry) {
@@ -163,9 +163,9 @@ int mpool_destroy(mpool_t *mpool)
     mpool->sbuf = NULL;
     mpool->data_size = 0;
     mpool->mode = MPOOL_MODE_DESTROYED;
-    mux_unlock(&mpool->lock);
+    mtx_unlock(&mpool->lock);
 
-    mux_destroy(&mpool->lock);
+    mtx_destroy(&mpool->lock);
     return 0;
 }
 
@@ -186,9 +186,9 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
         return NULL;
     }
 
-    mux_lock(&mpool->lock);
+    mtx_lock(&mpool->lock);
     if (mpool->mode == MPOOL_MODE_MALLOC) {
-        mux_unlock(&mpool->lock);
+        mtx_unlock(&mpool->lock);
         return malloc(size);
     }
 
@@ -197,7 +197,7 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
             mpool_elm_t *p = TAILQ_LAST(&mpool->hdr_free, __mpool_head);
             TAILQ_REMOVE(&mpool->hdr_free, p, entry);
             TAILQ_INSERT_HEAD(&mpool->hdr_used, p, entry);
-            mux_unlock(&mpool->lock);
+            mtx_unlock(&mpool->lock);
             return p->data;
         } else {
             if (mpool->mode == MPOOL_MODE_DGROWN) {
@@ -214,16 +214,16 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
                                             entry   );
                     }
                     TAILQ_INSERT_HEAD(&mpool->hdr_used, (mpool_elm_t *)pbuf, entry);
-                    mux_unlock(&mpool->lock);
+                    mtx_unlock(&mpool->lock);
                     return ((mpool_elm_t *)pbuf)->data;
                 }
             }
-            mux_unlock(&mpool->lock);
+            mtx_unlock(&mpool->lock);
             errno = LIB_ERRNO_SHORT_MPOOL;
             return NULL;
         }
     } else {
-        mux_unlock(&mpool->lock);
+        mtx_unlock(&mpool->lock);
         errno = LIB_ERRNO_MBLK_SHORT;
         return NULL;
     }
@@ -241,16 +241,16 @@ void* mpool_malloc(mpool_t *mpool, size_t size)
 void mpool_free(mpool_t *mpool, void *mem)
 {
     if (mpool && mem) {
-        mux_lock(&mpool->lock);
+        mtx_lock(&mpool->lock);
         if (mpool->mode == MPOOL_MODE_MALLOC) {
-            mux_unlock(&mpool->lock);
+            mtx_unlock(&mpool->lock);
             free(mem);
             return;
         }
         mpool_elm_t *p = CONTAINER_OF(mem, mpool_elm_t, data);
         TAILQ_REMOVE(&mpool->hdr_used, p, entry);
         TAILQ_INSERT_HEAD(&mpool->hdr_free, p, entry);
-        mux_unlock(&mpool->lock);
+        mtx_unlock(&mpool->lock);
     }
 }
 

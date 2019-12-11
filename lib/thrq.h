@@ -8,12 +8,10 @@
 #define __THR_QUEUE__
 
 #include <stdbool.h>
-#include <sys/queue.h>
-#include <pthread.h>
-
+#include "sysque.h"
+#include "threads_c11.h"
 #include "err.h"
 #include "mpool.h"
-#include "mux.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,9 +54,8 @@ typedef struct {
     mpool_t             *mpool;         ///< 内存池指针
 
     thrq_head_t         head;           ///< 数据队列
-    mux_t               lock;           ///< 互斥锁
-    pthread_condattr_t  cond_attr;      ///< 条件变量的属性
-    pthread_cond_t      cond;           ///< 条件变量
+    mtx_t               lock;           ///< 互斥锁
+    cnd_t               cond;           ///< 条件变量
 
     int                 count;          ///< 当前队列里的元素个数
 } thrq_cb_t;

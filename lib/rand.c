@@ -12,6 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include "threads_c11.h"
 #include "rand.h"
 #include "sha256.h"
 
@@ -55,7 +56,7 @@ unsigned int rnd_genseed(const void *seed, size_t len, const char *file)
     unsigned buf_size = len + sizeof(struct timespec) + file_size;
     char *buf = (char*)malloc(buf_size);
     if (buf) {
-        clock_gettime(CLOCK_MONOTONIC, &tms);
+        timespec_get(&tms, TIME_MONO);
         memcpy(buf, &tms, sizeof(struct timespec));             // copy time
         if (seed) {
             memcpy(buf + sizeof(struct timespec), seed, len);   // copy memory block
@@ -91,7 +92,11 @@ unsigned int rnd_genseed(const void *seed, size_t len, const char *file)
  */
 int rnd_srandom(unsigned int seed, rnd_buf_t *buf)
 {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+    return srandom_s(buf, seed);
+#else
     return srandom_r(seed, buf);
+#endif
 }
 
 /**
@@ -115,7 +120,11 @@ int rnd_srandom(unsigned int seed, rnd_buf_t *buf)
  */
 int rnd_random(rnd_buf_t *buf, int32_t *result)
 {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+    return random_s(result, buf);
+#else
     return random_r(buf, result);
+#endif
 }
 
 #ifdef __cplusplus

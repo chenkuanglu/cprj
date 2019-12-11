@@ -46,7 +46,11 @@ int nsleep(double sec)
  */
 struct tm* time2gmt(struct tm *result, const time_t *timep)
 {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+    return gmtime_s(result, timep);
+#else
     return gmtime_r(timep, result);
+#endif
 }
 
 /**
@@ -59,7 +63,11 @@ struct tm* time2gmt(struct tm *result, const time_t *timep)
  */
 struct tm* time2local(struct tm *result, const time_t *timep)
 {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+    return localtime_s(result, timep);
+#else
     return localtime_r(timep, result);
+#endif
 }
 
 /**

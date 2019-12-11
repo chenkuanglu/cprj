@@ -87,6 +87,28 @@ int strstrip(char *s)
     return last - s;
 }
 
+#if defined(_WIN32) && !defined(__CYGWIN__)
+/**
+ * @brief   动态(malloc)拷贝一个字符串
+ * @param   s   源字符串
+ * @return  成功返回拷贝后的新字符串，失败返回NULL并设置errno
+ */
+char* strdup(const char *s)
+{
+    char *t;
+    size_t len;
+    if (s == NULL) {
+        errno = EINVAL;
+        return NULL;
+    }
+    len = strlen(s) + 1 ;
+    t = (char*)malloc(len) ;
+    if (t != NULL) {
+        memcpy(t, s, len) ;
+    }
+    return t ;
+}
+#endif
 
 /**
  * @brief   二进制转换为hex

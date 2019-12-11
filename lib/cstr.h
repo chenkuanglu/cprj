@@ -23,6 +23,9 @@ extern char*    strlwr(char *s);
 extern char*    strupr(char *s);
 
 extern int      strstrip(char *s);
+#if defined(_WIN32) && !defined(__CYGWIN__)
+char*           strdup(const char *s)
+#endif
 
 extern int      bin2hex(char *hex, const void *bin, size_t len);
 extern char*    abin2hex(const void *bin, size_t len);

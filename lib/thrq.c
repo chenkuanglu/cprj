@@ -5,11 +5,7 @@
  */
 
 #include "thrq.h"
-#include "err.h"
 #include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,12 +29,9 @@ int thrq_init(thrq_cb_t *thrq, mpool_t *mp)
     }
 
     TAILQ_INIT(&thrq->head);
-    if (mux_init(&thrq->lock) != 0)
-        return -1;
-    pthread_condattr_init(&thrq->cond_attr);
-    if ((errno = pthread_condattr_setclock(&thrq->cond_attr, CLOCK_MONOTONIC)) != 0)
-        return -1;
-    if ((errno = pthread_cond_init(&thrq->cond, &thrq->cond_attr) != 0))
+    if (mtx_init(&thrq->lock, mtx_plain | mtx_recursive) == thrd_error)
+        return -1;    
+    if (cnd_init(&thrq->cond) == thrd_error) 
         return -1;
 
     thrq->count = 0;
@@ -96,9 +89,9 @@ bool thrq_empty(thrq_cb_t *thrq)
     if (thrq == NULL) {
         return true;
     }
-    mux_lock(&thrq->lock);
+    mtx_lock(&thrq->lock);
     bool empty = THRQ_EMPTY(thrq);
-    mux_unlock(&thrq->lock);
+    mtx_unlock(&thrq->lock);
     return empty;
 }
 
@@ -112,9 +105,9 @@ int thrq_count(thrq_cb_t *thrq)
     if (thrq == NULL) {
         return 0;
     }
-    mux_lock(&thrq->lock);
+    mtx_lock(&thrq->lock);
     int count = thrq->count;
-    mux_unlock(&thrq->lock);
+    mtx_unlock(&thrq->lock);
     return count;
 }
 
@@ -132,7 +125,7 @@ static int thrq_remove(thrq_cb_t *thrq, thrq_elm_t *elm)
         return -1;
     }
 
-    mux_lock(&thrq->lock);
+    mtx_lock(&thrq->lock);
     TAILQ_REMOVE(&thrq->head, elm, entry);
     if (thrq->mpool)
         mpool_free(thrq->mpool, elm);
@@ -141,7 +134,7 @@ static int thrq_remove(thrq_cb_t *thrq, thrq_elm_t *elm)
     if (thrq->count > 0) {
         thrq->count--;
     }
-    mux_unlock(&thrq->lock);
+    mtx_unlock(&thrq->lock);
     return 0;
 }
 
@@ -160,9 +153,9 @@ static int thrq_insert_tail(thrq_cb_t *thrq, void *data, size_t len)
         return -1;
     }
 
-    mux_lock(&thrq->lock);
+    mtx_lock(&thrq->lock);
     if (thrq->count >= THRQ_MAX_SIZE) {
-        mux_unlock(&thrq->lock);
+        mtx_unlock(&thrq->lock);
         errno = LIB_ERRNO_QUE_FULL;
         return -1;
     }
@@ -175,7 +168,7 @@ static int thrq_insert_tail(thrq_cb_t *thrq, void *data, size_t len)
 
     if (elm == 0) {
         int ec = errno;             // backup errno
-        mux_unlock(&thrq->lock);    // errno may be modified
+        mtx_unlock(&thrq->lock);    // errno may be modified
         errno = ec;
         return -1;
     }
@@ -184,7 +177,7 @@ static int thrq_insert_tail(thrq_cb_t *thrq, void *data, size_t len)
     TAILQ_INSERT_TAIL(&thrq->head, elm, entry);
     thrq->count++;
 
-    mux_unlock(&thrq->lock);
+    mtx_unlock(&thrq->lock);
     return 0;
 }
 
@@ -196,16 +189,15 @@ static int thrq_insert_tail(thrq_cb_t *thrq, void *data, size_t len)
 void thrq_destroy(thrq_cb_t *thrq)
 {
     if (thrq) {
-        mux_lock(&thrq->lock);
-        pthread_cond_destroy(&thrq->cond);
-        pthread_condattr_destroy(&thrq->cond_attr);
+        mtx_lock(&thrq->lock);
+        cnd_destroy(&thrq->cond);
         while (!THRQ_EMPTY(thrq)) {
             thrq_remove(thrq, THRQ_FIRST(thrq));
         }
         thrq->mpool = NULL;
-        mux_unlock(&thrq->lock);
+        mtx_unlock(&thrq->lock);
 
-        mux_destroy(&thrq->lock);
+        mtx_destroy(&thrq->lock);
     }
 }
 
@@ -227,21 +219,20 @@ int thrq_send(thrq_cb_t *thrq, void *data, size_t len, int flags)
 
     int lock_res;
     if (flags == THRQ_NOWAIT) {
-        if ((lock_res = mux_trylock(&thrq->lock)) == EBUSY) {
-            errno = lock_res;
+        if (mtx_trylock(&thrq->lock) == thrd_busy) {
             return -1;
         }
     } else {
-        mux_lock(&thrq->lock);
+        mtx_lock(&thrq->lock);
     }
     if (thrq_insert_tail(thrq, data, len) != 0) {
-        mux_unlock(&thrq->lock);
+        mtx_unlock(&thrq->lock);
         return -1;
     }
-    mux_unlock(&thrq->lock);
+    mtx_unlock(&thrq->lock);
 
     int res;
-    if ((res = pthread_cond_signal(&thrq->cond)) != 0) {
+    if ((res = cnd_signal(&thrq->cond)) != 0) {
         errno = res;
         return -1;
     }
@@ -284,7 +275,7 @@ int thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout, int
     int res = 0;
     struct timespec ts;
     if (timeout > 0) {
-        clock_gettime(CLOCK_MONOTONIC, &ts);
+        timespec_get(&ts, TIME_MONO);
         // ok, max_long_int = 2.1s > (1s + 1s)
         ts.tv_nsec = (long)((timeout - (long)timeout) * 1000000000L) + ts.tv_nsec;
         ts.tv_sec = (time_t)timeout + ts.tv_sec + (ts.tv_nsec / 1000000000L);
@@ -293,32 +284,32 @@ int thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout, int
 
     int lock_res;
     if (flags == THRQ_NOWAIT) {
-        if ((lock_res = mux_trylock(&thrq->lock)) == EBUSY) {
-            errno = lock_res;
+        if (mtx_trylock(&thrq->lock) == thrd_busy) {
             return -1;
         }
     } else {
-        mux_lock(&thrq->lock);
+        mtx_lock(&thrq->lock);
     }
 
     if (flags != THRQ_NOWAIT) {
         /* break when error occured or data receive */
         while (res == 0 && thrq->count == 0) {
             if (timeout > 0) {
-                res = pthread_cond_timedwait(&thrq->cond, &thrq->lock.mux, &ts);
+                res = cnd_timedwait(&thrq->cond, &thrq->lock, &ts);
             } else {
-                res = pthread_cond_wait(&thrq->cond, &thrq->lock.mux);
+                res = cnd_wait(&thrq->cond, &thrq->lock);
             }
         }
         if (res != 0) {
-            mux_unlock(&thrq->lock);
-            errno = res;
+            mtx_unlock(&thrq->lock);
+            if (res == thrd_timeout)
+                errno = ETIMEDOUT;
             return -1;      // errno may be the ETIMEDOUT
         }
     } else {
         if (thrq->count == 0) {
             errno = LIB_ERRNO_QUE_EMPTY;
-            mux_unlock(&thrq->lock);
+            mtx_unlock(&thrq->lock);
             return -1;
         }
     }
@@ -328,7 +319,7 @@ int thrq_receive(thrq_cb_t *thrq, void *buf, size_t bufsize, double timeout, int
     memcpy(buf, elm->data, cpsize);
     thrq_remove(thrq, elm);
 
-    mux_unlock(&thrq->lock);
+    mtx_unlock(&thrq->lock);
     return cpsize;
 }
 

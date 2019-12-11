@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "cstr.h"
 #include "err.h"
 
 #ifdef __cplusplus
@@ -91,7 +92,11 @@ char* err_string(int errnum, char *buf, size_t size)
         return NULL;
     }
     if (errnum < LIB_ERRNO_BASE) {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+        strerror_s(buf, size, errnum);
+#else
         strerror_r(errnum, buf, size);
+#endif
     } else {
         int ix = errnum - LIB_ERRNO_BASE;
         if (errtbl[ix] != NULL) {

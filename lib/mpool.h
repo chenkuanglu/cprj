@@ -16,8 +16,8 @@
 #ifndef __MEMORY_POOL__
 #define __MEMORY_POOL__
 
-#include <sys/queue.h>
-#include "mux.h"
+#include "sysque.h"
+#include "threads_c11.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,7 +41,7 @@ typedef TAILQ_HEAD(__mpool_head, __mpool_elm) mpool_head_t;
 typedef struct __mpool {
     mpool_head_t    hdr_free;   ///< 总空闲块（是一张链表）
     mpool_head_t    hdr_used;   ///< 总已用块（是一张链表）
-    mux_t           lock;       ///< 互斥锁
+    mtx_t           lock;       ///< 互斥锁
     size_t          data_size;  ///< 块内有效数据的大小（不是块的总大小）
     mpool_head_t    hdr_buf;    ///< 所有malloc到的大块（是一张链表）
     char*           sbuf;       ///< 指向外部给定的buffer
