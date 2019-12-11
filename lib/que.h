@@ -8,11 +8,10 @@
 #define __QUEUE__
 
 #include <stdbool.h>
-#include <pthread.h>
-
+#include "sysque.h"
+#include "threads_c11.h"
 #include "err.h"
 #include "mpool.h"
-#include "mux.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +57,7 @@ typedef struct {
     mpool_t             *mpool;         ///< 内存池指针
 
     que_head_t          head;           ///< 数据队列
-    mux_t               lock;           ///< 互斥锁
+    mtx_t               lock;           ///< 互斥锁
     int                 count;          ///< 当前队列里的元素个数
 } que_cb_t;
 

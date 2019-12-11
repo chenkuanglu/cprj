@@ -25,7 +25,7 @@ int que_init(que_cb_t *que, mpool_t *mp)
         return -1;
     }
     TAILQ_INIT(&que->head);
-    mux_init(&que->lock);
+    mtx_init(&que->lock, mtx_plain | mtx_recursive);
     que->count = 0;
     que->mpool = mp;
     return 0;
@@ -65,9 +65,9 @@ bool que_empty(que_cb_t *que)
     if (que == NULL) {
         return true;
     }
-    mux_lock(&que->lock);
+    mtx_lock(&que->lock);
     int empty = QUE_EMPTY(que);
-    mux_unlock(&que->lock);
+    mtx_unlock(&que->lock);
 
     return empty;
 }
@@ -82,9 +82,9 @@ int que_count(que_cb_t *que)
     if (que == NULL) {
         return 0;
     }
-    mux_lock(&que->lock);
+    mtx_lock(&que->lock);
     int count = que->count;
-    mux_unlock(&que->lock);
+    mtx_unlock(&que->lock);
 
     return count;
 }
@@ -105,10 +105,10 @@ int que_insert_head(que_cb_t *que, void *data, size_t len)
         return -1;
     }
 
-    mux_lock(&que->lock);
+    mtx_lock(&que->lock);
     /* queue is full */
     if (que->count >= QUE_MAX_SIZE) {
-        mux_unlock(&que->lock);
+        mtx_unlock(&que->lock);
         errno = LIB_ERRNO_QUE_FULL;
         return -1;
     }
@@ -119,7 +119,7 @@ int que_insert_head(que_cb_t *que, void *data, size_t len)
     else
         elm = (que_elm_t*)malloc(QUE_BLOCK_SIZE(len));
     if (elm == 0) {
-        mux_unlock(&que->lock);
+        mtx_unlock(&que->lock);
         return -1;
     }
     /* insert queue */
@@ -128,7 +128,7 @@ int que_insert_head(que_cb_t *que, void *data, size_t len)
     TAILQ_INSERT_HEAD(&que->head, elm, entry);
     que->count++;
 
-    mux_unlock(&que->lock);
+    mtx_unlock(&que->lock);
     return 0;
 }
 
@@ -147,10 +147,10 @@ int que_insert_tail(que_cb_t *que, void *data, size_t len)
         return -1;
     }
 
-    mux_lock(&que->lock);
+    mtx_lock(&que->lock);
     /* queue is full */
     if (que->count >= QUE_MAX_SIZE) {
-        mux_unlock(&que->lock);
+        mtx_unlock(&que->lock);
         return -1;
     }
     /* malloc */
@@ -160,7 +160,7 @@ int que_insert_tail(que_cb_t *que, void *data, size_t len)
     else
         elm = (que_elm_t*)malloc(QUE_BLOCK_SIZE(len));
     if (elm == 0) {
-        mux_unlock(&que->lock);
+        mtx_unlock(&que->lock);
         return -1;
     }
     /* insert queue */
@@ -169,7 +169,7 @@ int que_insert_tail(que_cb_t *que, void *data, size_t len)
     TAILQ_INSERT_TAIL(&que->head, elm, entry);
     que->count++;
 
-    mux_unlock(&que->lock);
+    mtx_unlock(&que->lock);
     return 0;
 }
 
@@ -253,14 +253,14 @@ int QUE_INSERT_BEFORE(que_cb_t *que, que_elm_t *list_elm, void *data, size_t len
 void que_destroy(que_cb_t *que)
 {
     if (que) {
-        mux_lock(&que->lock);
+        mtx_lock(&que->lock);
         while (!QUE_EMPTY(que)) {
             QUE_REMOVE(que, QUE_FIRST(que));
         }
         que->mpool = NULL;
-        mux_unlock(&que->lock);
+        mtx_unlock(&que->lock);
 
-        mux_destroy(&que->lock);
+        mtx_destroy(&que->lock);
     }
 }
 
@@ -304,10 +304,10 @@ int que_remove(que_cb_t *que, void *data, size_t len, que_cmp_data_t pfn_cmp)
         return -1;
     }
     que_elm_t *elm;
-    mux_lock(&que->lock);
+    mtx_lock(&que->lock);
     if ((elm = QUE_FIND(que, data, len, pfn_cmp)) == NULL) {
         errno = LIB_ERRNO_NOT_EXIST;
-        mux_unlock(&que->lock);
+        mtx_unlock(&que->lock);
         return -1;
     }
     TAILQ_REMOVE(&que->head, elm, entry);
@@ -318,7 +318,7 @@ int que_remove(que_cb_t *que, void *data, size_t len, que_cmp_data_t pfn_cmp)
     if (que->count > 0) {
         que->count--;
     }
-    mux_unlock(&que->lock);
+    mtx_unlock(&que->lock);
     return 0;
 }
 
